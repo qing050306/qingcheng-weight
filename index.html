@@ -1,0 +1,3287 @@
+<!DOCTYPE html>
+<!--
+  轻秤 · 本地体重记录
+  使用说明、数据口径与自测记录见同目录 README.md。
+  数据键：localStorage["weight-v1"]；体重以整数克保存；日期固定按 Asia/Shanghai。
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f3f7fa">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="轻秤，一个只记录体重的本地应用。数据仅保存在当前浏览器。">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="轻秤">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>轻秤 · 体重记录</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='10' fill='%23edf5f9'/%3E%3Cpath d='M8 23.5h16M10.4 23.5v-6.1a5.6 5.6 0 0 1 11.2 0v6.1' fill='none' stroke='%234f7c96' stroke-width='1.7' stroke-linecap='round'/%3E%3Cpath d='M16 17.2l3-3.8' fill='none' stroke='%234f7c96' stroke-width='1.7' stroke-linecap='round'/%3E%3Ccircle cx='16' cy='17.2' r='1.35' fill='%234f7c96'/%3E%3C/svg%3E">
+  <style>
+    /* ===== 设计变量 ===== */
+    :root {
+      --bg: #f3f7fa;
+      --surface: #ffffff;
+      --surface-soft: #f9fcfe;
+      --surface-tint: #f5fafc;
+      --ink: #233b4a;
+      --ink-soft: #3f5868;
+      --muted: #5a7080;
+      --faint: #5f7482;
+      --line: #e4edf2;
+      --line-strong: #d7e5ed;
+      --accent: #4f7c96;
+      --accent-deep: #3b637b;
+      --accent-soft: #edf5f9;
+      --accent-ring: rgba(79, 124, 150, 0.14);
+      --down: #3f7b72;
+      --down-soft: #f0f7f5;
+      --up: #966253;
+      --up-soft: #faf3f1;
+      --flat: #6e8290;
+      --danger: #9e5151;
+      --danger-deep: #8a4242;
+      --danger-soft: #fbf2f1;
+      --radius: 20px;
+      --shadow: 0 12px 34px rgba(49, 80, 100, 0.055), 0 2px 7px rgba(49, 80, 100, 0.025);
+      --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+      --font-serif: Georgia, "Times New Roman", "Songti SC", "STSong", "SimSun", serif;
+    }
+
+    /* ===== 基础 ===== */
+    *, *::before, *::after { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html {
+      min-width: 320px;
+      background: var(--bg);
+      -webkit-text-size-adjust: 100%;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      min-height: 100dvh;
+      overflow-x: hidden;
+      color: var(--ink);
+      background:
+        radial-gradient(920px 420px at 50% -170px, #e8f2f8 0%, rgba(232, 242, 248, 0) 72%),
+        var(--bg);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    body.modal-open { overflow: hidden; }
+    button, input, textarea, select { font: inherit; color: inherit; }
+    button {
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    button:disabled { cursor: default; }
+    h1, h2, h3, p, figure { margin: 0; }
+    svg { display: block; }
+    a { color: var(--accent-deep); }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    .skip-link {
+      position: fixed;
+      z-index: 500;
+      top: 10px;
+      left: 10px;
+      padding: 9px 13px;
+      border-radius: 9px;
+      color: #fff;
+      background: var(--accent-deep);
+      font-size: 13px;
+      transform: translateY(-160%);
+      transition: transform 160ms ease;
+    }
+    .skip-link:focus { transform: translateY(0); }
+    :focus-visible {
+      outline: 2px solid #6f96ac;
+      outline-offset: 3px;
+    }
+    button:focus:not(:focus-visible), input:focus:not(:focus-visible) { outline: none; }
+    ::selection { background: #d9e9f2; color: var(--ink); }
+
+    /* ===== 页面骨架 ===== */
+    .app-root { min-height: 100vh; min-height: 100dvh; }
+    .page {
+      width: min(100%, 520px);
+      min-height: 100vh;
+      min-height: 100dvh;
+      margin: 0 auto;
+      padding: 0 18px calc(112px + env(safe-area-inset-bottom));
+    }
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: calc(18px + env(safe-area-inset-top)) 2px 18px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      flex: 0 0 34px;
+      display: grid;
+      place-items: center;
+      color: var(--accent);
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid var(--line-strong);
+      border-radius: 11px;
+      box-shadow: 0 3px 10px rgba(49, 80, 100, 0.04);
+    }
+    .brand-mark svg { width: 20px; height: 20px; }
+    .brand h1 {
+      font-family: var(--font-serif);
+      font-size: 22px;
+      line-height: 1;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+    }
+    .icon-button {
+      width: 44px;
+      height: 44px;
+      flex: 0 0 44px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid var(--line-strong);
+      border-radius: 50%;
+      transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+    }
+    .icon-button:hover { background: #fff; color: var(--icon-hover, var(--accent-deep)); }
+    .icon-button:active { transform: scale(0.955); }
+    .icon-button svg { width: 19px; height: 19px; }
+    .main { display: flex; flex-direction: column; gap: 16px; }
+    .card {
+      position: relative;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .card-title {
+      color: var(--ink);
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.35;
+      letter-spacing: 0.01em;
+    }
+    .inline-action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 38px;
+      padding: 0 1px;
+      color: var(--accent-deep);
+      background: none;
+      border: 0;
+      font-size: 12.5px;
+      font-weight: 600;
+      text-decoration: underline;
+      text-decoration-color: rgba(59, 99, 123, 0.3);
+      text-underline-offset: 4px;
+      transition: color 160ms ease, text-decoration-color 160ms ease;
+    }
+    .inline-action:hover { color: var(--ink); text-decoration-color: var(--ink); }
+
+    /* ===== 当前体重 ===== */
+    .current-card {
+      padding: 20px 21px 19px;
+      overflow: hidden;
+      background: linear-gradient(152deg, #ffffff 0%, #fcfdfe 58%, #f8fbfd 100%);
+    }
+    .current-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 24px;
+    }
+    .current-label {
+      color: var(--muted);
+      font-size: 12.5px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+    }
+    .today-hint {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 24px;
+      padding: 0 9px;
+      color: #527288;
+      background: #f2f8fb;
+      border: 1px solid #e2edf3;
+      border-radius: 999px;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    .today-hint::before {
+      content: "";
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: #83a7ba;
+    }
+    .current-weight-line {
+      display: flex;
+      align-items: baseline;
+      gap: 9px;
+      margin-top: 11px;
+      min-width: 0;
+    }
+    .weight-value {
+      font-family: var(--font-serif);
+      font-size: clamp(60px, 18vw, 74px);
+      font-weight: 500;
+      font-variant-numeric: tabular-nums lining-nums;
+      line-height: 0.92;
+      letter-spacing: -0.045em;
+      color: var(--ink);
+    }
+    .weight-value.is-placeholder { color: #b4c5d0; letter-spacing: 0; }
+    .weight-unit {
+      color: var(--muted);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.03em;
+    }
+    .current-meta {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 7px 9px;
+      margin-top: 11px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .change { display: inline-flex; align-items: baseline; gap: 4px; font-weight: 600; }
+    .change-caption { color: var(--muted); font-weight: 500; }
+    .change.is-down .change-value { color: var(--down); }
+    .change.is-up .change-value { color: var(--up); }
+    .change.is-flat .change-value { color: var(--flat); }
+    .change.is-first { color: var(--muted); font-weight: 500; }
+    .meta-dot {
+      width: 3px;
+      height: 3px;
+      border-radius: 50%;
+      background: #b8c8d2;
+    }
+    .record-time { color: var(--muted); font-variant-numeric: tabular-nums; }
+    .current-empty {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      margin-top: 13px;
+      padding-top: 13px;
+      border-top: 1px solid var(--line);
+    }
+    .current-empty p {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+    .current-empty .inline-action { flex: 0 0 auto; }
+
+    /* ===== 目标进度 ===== */
+    .goal-card { padding: 19px 21px 18px; }
+    .goal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .goal-achieved {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--accent-deep);
+      font-size: 11.5px;
+      font-weight: 600;
+    }
+    .goal-achieved svg { width: 14px; height: 14px; }
+    .goal-bar {
+      height: 7px;
+      margin-top: 16px;
+      overflow: hidden;
+      background: #edf4f7;
+      border-radius: 999px;
+    }
+    .goal-fill {
+      display: block;
+      width: 0;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #a9c8d7 0%, #6b94ab 58%, #4f7c96 100%);
+      transition: width 220ms cubic-bezier(0.22, 0.8, 0.28, 1);
+    }
+    .goal-card.is-complete .goal-fill { background: linear-gradient(90deg, #8fb5c7, #4f7c96); }
+    .goal-scale {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 9px;
+      color: var(--faint);
+      font-size: 11px;
+    }
+    .goal-scale b {
+      color: var(--muted);
+      font-family: var(--font-serif);
+      font-size: 11.5px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .goal-metrics {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 12.5px;
+      line-height: 1.5;
+    }
+    .goal-metrics b {
+      color: var(--ink-soft);
+      font-family: var(--font-serif);
+      font-size: 13px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .goal-change.is-down b { color: var(--down); }
+    .goal-change.is-up b { color: var(--up); }
+    .goal-remaining { color: var(--ink-soft); font-weight: 600; }
+    .goal-card.is-complete .goal-remaining { color: var(--accent-deep); }
+
+    /* ===== 趋势图 ===== */
+    .trend-card { padding: 19px 21px 17px; }
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .range-switch {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 3px;
+      background: #f2f7fa;
+      border: 1px solid #e7eff4;
+      border-radius: 11px;
+    }
+    .range-button {
+      min-width: 44px;
+      height: 32px;
+      padding: 0 7px;
+      color: var(--muted);
+      background: transparent;
+      border: 0;
+      border-radius: 8px;
+      font-size: 11.5px;
+      font-weight: 600;
+      line-height: 1;
+      white-space: nowrap;
+      transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+    }
+    .range-button[aria-pressed="true"] {
+      color: var(--accent-deep);
+      background: #fff;
+      box-shadow: 0 1px 4px rgba(45, 74, 92, 0.09);
+    }
+    .range-button:hover { color: var(--accent-deep); }
+    .trend-body { margin-top: 10px; }
+    .chart-holder {
+      width: 100%;
+      min-width: 0;
+      margin-top: 4px;
+      overflow: hidden;
+    }
+    .trend-svg { width: 100%; height: auto; overflow: visible; }
+    .trend-svg text { font-family: var(--font-sans); }
+    .chart-grid { stroke: #eaf1f5; stroke-width: 1; stroke-dasharray: 2 4; }
+    .chart-axis { fill: var(--faint); font-size: 10px; font-variant-numeric: tabular-nums; }
+    .chart-date { fill: var(--faint); font-size: 10px; }
+    .chart-line {
+      fill: none;
+      stroke: #5b88a1;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .chart-dot { fill: #fff; stroke: #5b88a1; stroke-width: 1.5; }
+    .chart-extreme { fill: none; stroke-width: 1.5; }
+    .chart-halo { fill: #4f7c96; opacity: 0.1; }
+    .chart-latest-dot { fill: #4f7c96; stroke: #fff; stroke-width: 1.5; }
+    .trend-summary {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 7px 14px;
+      margin-top: 7px;
+      padding-top: 11px;
+      border-top: 1px solid #eef4f7;
+      color: var(--muted);
+      font-size: 11.5px;
+      line-height: 1.5;
+      font-variant-numeric: tabular-nums;
+    }
+    .summary-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .summary-item b {
+      color: var(--ink-soft);
+      font-family: var(--font-serif);
+      font-size: 12.5px;
+      font-weight: 600;
+    }
+    .summary-dot {
+      width: 5px;
+      height: 5px;
+      flex: 0 0 5px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+    .summary-dot.max { background: #b18a67; }
+    .summary-dot.min { background: #658f8a; }
+    .summary-dot.latest { background: var(--accent); }
+    .chart-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 190px;
+      padding: 25px 12px 20px;
+      color: var(--muted);
+      text-align: center;
+    }
+    .chart-empty p { font-size: 13px; }
+    .chart-empty .inline-action { margin-top: 4px; }
+
+    /* ===== 统计 ===== */
+    .stats-card { padding: 18px 21px 19px; }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1.02fr 1fr 0.9fr;
+      margin-top: 14px;
+    }
+    .stat { min-width: 0; padding: 0 14px; }
+    .stat:first-child { padding-left: 0; }
+    .stat + .stat { border-left: 1px solid var(--line); }
+    .stat-label {
+      display: block;
+      overflow: hidden;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.4;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+    .stat-value {
+      display: flex;
+      align-items: baseline;
+      gap: 3px;
+      min-height: 27px;
+      margin-top: 7px;
+      color: var(--ink);
+      font-family: var(--font-serif);
+      font-size: 22px;
+      font-variant-numeric: tabular-nums lining-nums;
+      font-weight: 500;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+    }
+    .stat-value.is-down { color: var(--down); }
+    .stat-value.is-up { color: var(--up); }
+    .stat-value.is-flat { color: var(--flat); }
+    .stat-unit {
+      color: var(--faint);
+      font-family: var(--font-sans);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0;
+    }
+    .empty-value { color: #a9bac5; }
+
+    /* ===== 历史记录 ===== */
+    .history-section { display: flex; flex-direction: column; gap: 10px; }
+    .section-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 3px 2px 0;
+    }
+    .section-head h2 {
+      color: var(--ink);
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+    .section-count { color: var(--faint); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+    .history-card { overflow: hidden; }
+    .history-group + .history-group { border-top: 1px solid var(--line); }
+    .date-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 11px 20px 7px;
+      color: var(--muted);
+      background: #fbfdfe;
+      font-size: 11.5px;
+      font-weight: 500;
+      line-height: 1.45;
+    }
+    .date-heading span:last-child {
+      color: var(--faint);
+      font-size: 10.5px;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .history-row {
+      width: 100%;
+      min-height: 57px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 12px 20px;
+      color: var(--ink);
+      background: transparent;
+      border: 0;
+      border-top: 1px solid #f0f5f8;
+      text-align: left;
+      transition: background-color 150ms ease;
+    }
+    .date-heading + .history-row { border-top: 0; }
+    .history-row:hover { background: #fbfdfe; }
+    .history-row:active { background: #f7fbfd; }
+    .history-main { min-width: 0; flex: 1 1 auto; }
+    .history-time {
+      display: block;
+      color: var(--ink-soft);
+      font-size: 12px;
+      font-weight: 500;
+      line-height: 1.5;
+      font-variant-numeric: tabular-nums;
+    }
+    .history-note {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11.5px;
+      line-height: 1.6;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+    .history-figures {
+      display: flex;
+      flex: 0 0 auto;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 3px;
+    }
+    .history-weight-line { display: flex; align-items: baseline; gap: 4px; white-space: nowrap; }
+    .history-weight {
+      color: var(--ink);
+      font-family: var(--font-serif);
+      font-size: 18px;
+      font-weight: 500;
+      line-height: 1.3;
+      letter-spacing: -0.02em;
+      font-variant-numeric: tabular-nums lining-nums;
+    }
+    .history-unit { color: var(--faint); font-size: 10px; }
+    .history-change {
+      color: var(--muted);
+      font-size: 10.5px;
+      line-height: 1.4;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    .history-change.is-down { color: var(--down); }
+    .history-change.is-up { color: var(--up); }
+    .history-change.is-flat { color: var(--flat); }
+    .history-change.is-first { color: var(--faint); }
+    .history-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 144px;
+      padding: 26px 20px;
+      text-align: center;
+    }
+    .history-empty p { color: var(--muted); font-size: 13px; }
+    .page-footnote {
+      padding: 20px 2px 0;
+      color: var(--faint);
+      font-size: 11px;
+      text-align: center;
+      letter-spacing: 0.02em;
+    }
+
+    /* ===== 底部操作 ===== */
+    .dock {
+      position: fixed;
+      z-index: 30;
+      right: 0;
+      bottom: 0;
+      left: 0;
+      display: flex;
+      justify-content: center;
+      padding: 16px 18px calc(15px + env(safe-area-inset-bottom));
+      pointer-events: none;
+    }
+    .dock::before {
+      content: "";
+      position: absolute;
+      right: 50%;
+      bottom: 0;
+      left: 50%;
+      width: min(100%, 520px);
+      height: 100%;
+      background: linear-gradient(180deg, rgba(243, 247, 250, 0) 0%, rgba(243, 247, 250, 0.9) 44%, rgba(243, 247, 250, 0.98) 100%);
+      transform: translateX(-50%);
+      pointer-events: none;
+    }
+    .dock-inner {
+      position: relative;
+      z-index: 1;
+      width: min(100%, 484px);
+      pointer-events: auto;
+    }
+    .primary-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 48px;
+      padding: 0 20px;
+      color: #fff;
+      background: linear-gradient(180deg, #4c7891 0%, #436d85 100%);
+      border: 1px solid rgba(40, 71, 89, 0.3);
+      border-radius: 14px;
+      box-shadow: 0 8px 20px rgba(51, 83, 102, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.13);
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease, opacity 160ms ease;
+    }
+    .primary-button:hover:not(:disabled) { background: linear-gradient(180deg, #47728b 0%, #3e667d 100%); }
+    .primary-button:active:not(:disabled) { transform: translateY(1px) scale(0.995); box-shadow: 0 4px 12px rgba(51, 83, 102, 0.14); }
+    .primary-button:disabled { opacity: 0.58; box-shadow: none; }
+    .cta { width: 100%; min-height: 53px; border-radius: 16px; font-size: 15px; }
+    .cta svg { width: 17px; height: 17px; }
+
+    /* ===== 弹层 / 底部面板 ===== */
+    .overlay {
+      position: fixed;
+      z-index: 80;
+      inset: 0;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+    }
+    .overlay-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(29, 47, 59, 0.34);
+      opacity: 0;
+      transition: opacity 200ms ease;
+      -webkit-backdrop-filter: blur(3px);
+      backdrop-filter: blur(3px);
+    }
+    .overlay.is-open .overlay-backdrop { opacity: 1; }
+    .sheet {
+      position: relative;
+      z-index: 1;
+      width: min(100%, 520px);
+      max-height: calc(100vh - 16px);
+      max-height: calc(100dvh - 16px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding: 7px 20px calc(18px + env(safe-area-inset-bottom));
+      background: #fff;
+      border: 1px solid rgba(213, 227, 235, 0.72);
+      border-bottom: 0;
+      border-radius: 24px 24px 0 0;
+      box-shadow: 0 -10px 40px rgba(30, 54, 68, 0.14);
+      transform: translateY(102%);
+      transition: transform 240ms cubic-bezier(0.22, 0.82, 0.26, 1);
+      -webkit-overflow-scrolling: touch;
+    }
+    .overlay.is-open .sheet { transform: translateY(0); }
+    .overlay:not(.is-open) .sheet { pointer-events: none; }
+    .sheet-handle {
+      width: 34px;
+      height: 4px;
+      margin: 1px auto 13px;
+      background: #e1ebf0;
+      border-radius: 999px;
+    }
+    .sheet-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .sheet-header h2 {
+      color: var(--ink);
+      font-size: 20px;
+      font-weight: 600;
+      line-height: 1.35;
+      letter-spacing: 0.01em;
+    }
+    .sheet-header .icon-button {
+      width: 40px;
+      height: 40px;
+      flex-basis: 40px;
+      border-color: #e5edf2;
+      background: #f9fcfd;
+    }
+    .record-form { margin-top: 16px; }
+    .form-field { min-width: 0; }
+    .form-field + .form-field, .form-row { margin-top: 16px; }
+    .form-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 12px;
+    }
+    .form-row > .form-field + .form-field { margin-top: 0; }
+    .record-form > .field-hint + .form-field,
+    .record-form > .field-error + .form-field { margin-top: 16px; }
+    .form-field label {
+      display: block;
+      margin-bottom: 7px;
+      color: var(--ink-soft);
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+    .label-optional { color: var(--faint); font-size: 10.5px; font-weight: 400; }
+    .weight-entry {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      min-height: 68px;
+      padding: 5px 14px;
+      background: #f9fcfd;
+      border: 1px solid var(--line-strong);
+      border-radius: 14px;
+      transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+    }
+    .weight-entry:focus-within {
+      background: #fff;
+      border-color: #91b1c3;
+      box-shadow: 0 0 0 3px var(--accent-ring);
+    }
+    .weight-entry.has-error { border-color: #c68b84; }
+    .weight-entry input {
+      width: 100%;
+      min-width: 0;
+      padding: 3px 0;
+      color: var(--ink);
+      background: transparent;
+      border: 0;
+      outline: 0;
+      font-family: var(--font-serif);
+      font-size: 34px;
+      font-weight: 500;
+      line-height: 1.2;
+      letter-spacing: -0.025em;
+      font-variant-numeric: tabular-nums;
+    }
+    .weight-entry input::placeholder {
+      color: #b2c1ca;
+      font-family: var(--font-sans);
+      font-size: 18px;
+      font-weight: 400;
+      letter-spacing: 0;
+    }
+    .input-unit { flex: 0 0 auto; color: var(--muted); font-size: 13px; }
+    .form-input {
+      width: 100%;
+      min-width: 0;
+      height: 47px;
+      padding: 0 12px;
+      color: var(--ink);
+      background: #f9fcfd;
+      border: 1px solid var(--line-strong);
+      border-radius: 12px;
+      font-family: var(--font-sans);
+      font-size: 16px;
+      line-height: 1.4;
+      outline: 0;
+      transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+    }
+    .form-input:focus {
+      background: #fff;
+      border-color: #91b1c3;
+      box-shadow: 0 0 0 3px var(--accent-ring);
+    }
+    .form-input[aria-invalid="true"] { border-color: #c68b84; }
+    .form-input::placeholder { color: #a8b8c2; font-size: 13px; }
+    .field-hint { margin-top: 6px; color: var(--muted); font-size: 11.5px; line-height: 1.55; }
+    .field-error {
+      margin-top: 6px;
+      color: var(--danger);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+    .form-error {
+      margin-top: 14px;
+      padding: 10px 12px;
+      color: var(--danger);
+      background: var(--danger-soft);
+      border: 1px solid #f1dedc;
+      border-radius: 10px;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .sheet-actions { margin-top: 20px; display: flex; flex-direction: column; gap: 5px; }
+    .save-button { width: 100%; min-height: 50px; }
+    .delete-link {
+      align-self: center;
+      min-height: 42px;
+      padding: 0 10px;
+      color: var(--danger);
+      background: none;
+      border: 0;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 500;
+      transition: color 150ms ease, background-color 150ms ease;
+    }
+    .delete-link:hover { color: var(--danger-deep); background: #fdf7f6; }
+
+    /* ===== 设置页 ===== */
+    .settings-view {
+      position: fixed;
+      z-index: 60;
+      inset: 0;
+      display: flex;
+      justify-content: center;
+      background: rgba(31, 51, 64, 0.22);
+      opacity: 0;
+      transition: opacity 200ms ease;
+    }
+    .settings-view.is-open { opacity: 1; }
+    .settings-panel {
+      display: flex;
+      flex-direction: column;
+      width: min(100%, 520px);
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+      background: var(--bg);
+      box-shadow: 0 0 50px rgba(25, 46, 59, 0.14);
+      transform: translateX(24px);
+      transition: transform 240ms cubic-bezier(0.22, 0.82, 0.26, 1);
+    }
+    .settings-view.is-open .settings-panel { transform: translateX(0); }
+    .settings-view:not(.is-open) .settings-panel { pointer-events: none; }
+    .settings-header {
+      display: grid;
+      grid-template-columns: 44px minmax(0, 1fr) 44px;
+      align-items: center;
+      flex: 0 0 auto;
+      gap: 8px;
+      padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
+      background: rgba(245, 249, 251, 0.94);
+      border-bottom: 1px solid rgba(215, 229, 237, 0.8);
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+    }
+    .settings-header h2 {
+      color: var(--ink);
+      font-size: 15px;
+      font-weight: 600;
+      line-height: 1.4;
+      text-align: center;
+      letter-spacing: 0.02em;
+    }
+    .settings-header .icon-button {
+      width: 38px;
+      height: 38px;
+      flex-basis: 38px;
+      background: transparent;
+      border-color: transparent;
+      border-radius: 10px;
+    }
+    .settings-header .icon-button:hover { background: rgba(255, 255, 255, 0.74); }
+    .settings-content {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding: 17px 18px 24px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .settings-section + .settings-section { margin-top: 23px; }
+    .settings-section-title-row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 4px;
+      margin-bottom: 8px;
+    }
+    .settings-section h3 {
+      color: var(--muted);
+      font-size: 11.5px;
+      font-weight: 600;
+      line-height: 1.5;
+      letter-spacing: 0.08em;
+    }
+    .section-meta {
+      color: var(--faint);
+      font-size: 10.5px;
+      line-height: 1.5;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .settings-card {
+      overflow: hidden;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 8px 24px rgba(49, 80, 100, 0.04);
+    }
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 58px;
+      padding: 0 16px;
+    }
+    .setting-row + .setting-row { border-top: 1px solid #edf3f6; }
+    .setting-label { color: var(--ink-soft); font-size: 13px; font-weight: 500; white-space: nowrap; }
+    .setting-entry {
+      display: flex;
+      align-items: baseline;
+      justify-content: flex-end;
+      gap: 5px;
+      min-width: 0;
+    }
+    .setting-input {
+      width: 110px;
+      min-width: 0;
+      padding: 9px 0;
+      color: var(--ink);
+      background: transparent;
+      border: 0;
+      border-radius: 6px;
+      outline: 0;
+      font-family: var(--font-serif);
+      font-size: 20px;
+      font-weight: 500;
+      line-height: 1.2;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    .setting-input:focus { box-shadow: 0 0 0 3px var(--accent-ring); }
+    .setting-input::placeholder {
+      color: #a3b4be;
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 400;
+    }
+    .setting-input[aria-invalid="true"] { color: var(--danger); }
+    .setting-unit { color: var(--faint); font-size: 10.5px; white-space: nowrap; }
+    .setting-note {
+      padding: 0 16px 14px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.65;
+      border-top: 1px solid #edf3f6;
+      padding-top: 10px;
+    }
+    .setting-row + .setting-note { border-top: 1px solid #edf3f6; }
+    .settings-error {
+      margin: 9px 2px 0;
+      color: var(--danger);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+    .unit-card { padding: 13px 15px 12px; }
+    .unit-toggle {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3px;
+      padding: 3px;
+      background: #f2f7fa;
+      border: 1px solid #e7eff4;
+      border-radius: 11px;
+    }
+    .unit-toggle button {
+      height: 38px;
+      color: var(--muted);
+      background: transparent;
+      border: 0;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+    }
+    .unit-toggle button[aria-pressed="true"] {
+      color: var(--accent-deep);
+      background: #fff;
+      box-shadow: 0 1px 4px rgba(45, 74, 92, 0.09);
+    }
+    .setting-note.inline { padding: 10px 2px 0; border-top: 0; }
+    .data-card { padding: 0 16px; }
+    .data-action {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      width: 100%;
+      min-height: 54px;
+      padding: 0;
+      color: var(--ink-soft);
+      background: none;
+      border: 0;
+      border-top: 1px solid #edf3f6;
+      font-size: 13px;
+      text-align: left;
+      transition: color 150ms ease;
+    }
+    .data-action:first-child { border-top: 0; }
+    .data-action:hover:not(:disabled) { color: var(--accent-deep); }
+    .data-action svg { width: 17px; height: 17px; flex: 0 0 auto; color: #92a5b0; }
+    .data-action.is-danger { color: var(--danger); }
+    .data-action.is-danger svg { color: #b9827e; }
+    .data-action:disabled { color: #a4b2ba; }
+    .data-status {
+      margin-top: 9px;
+      padding: 9px 11px;
+      color: var(--muted);
+      background: var(--surface-soft);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      font-size: 11.5px;
+      line-height: 1.6;
+    }
+    .data-status[data-tone="error"] {
+      color: var(--danger);
+      background: var(--danger-soft);
+      border-color: #f0ddda;
+    }
+    .data-status[data-tone="success"] {
+      color: var(--accent-deep);
+      background: var(--accent-soft);
+      border-color: #deebf2;
+    }
+    .settings-footnote {
+      padding: 15px 4px 0;
+      color: var(--faint);
+      font-size: 10.5px;
+      line-height: 1.7;
+    }
+    .settings-footer {
+      flex: 0 0 auto;
+      padding: 10px 18px calc(11px + env(safe-area-inset-bottom));
+      background: rgba(245, 249, 251, 0.96);
+      border-top: 1px solid rgba(215, 229, 237, 0.8);
+      -webkit-backdrop-filter: blur(14px);
+      backdrop-filter: blur(14px);
+    }
+    .settings-footer .primary-button { width: 100%; }
+
+    /* ===== 二次确认 ===== */
+    .confirm-layer {
+      z-index: 120;
+      align-items: center;
+      padding: 20px;
+    }
+    .confirm-dialog {
+      position: relative;
+      z-index: 1;
+      width: min(100%, 340px);
+      padding: 21px 20px 18px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      box-shadow: 0 22px 55px rgba(26, 47, 60, 0.2);
+      opacity: 0;
+      transform: translateY(7px) scale(0.985);
+      transition: opacity 180ms ease, transform 180ms ease;
+    }
+    .confirm-layer.is-open .confirm-dialog { opacity: 1; transform: translateY(0) scale(1); }
+    .confirm-dialog h2 { color: var(--ink); font-size: 17px; font-weight: 600; line-height: 1.5; }
+    .confirm-message {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.7;
+      overflow-wrap: anywhere;
+    }
+    .confirm-error {
+      margin-top: 10px;
+      color: var(--danger);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    .confirm-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 9px;
+      margin-top: 19px;
+    }
+    .confirm-actions button {
+      min-height: 44px;
+      border-radius: 11px;
+      font-size: 13px;
+      font-weight: 600;
+      transition: background-color 160ms ease, opacity 160ms ease, transform 160ms ease;
+    }
+    .confirm-actions button:active:not(:disabled) { transform: scale(0.985); }
+    .secondary-button {
+      color: var(--ink-soft);
+      background: #f4f8fa;
+      border: 1px solid var(--line-strong);
+    }
+    .secondary-button:hover { background: #edf4f7; }
+    .confirm-accept {
+      color: #fff;
+      background: var(--danger);
+      border: 1px solid var(--danger);
+    }
+    .confirm-accept:hover:not(:disabled) { background: var(--danger-deep); }
+    .confirm-accept:disabled { opacity: 0.55; }
+
+    /* ===== Toast ===== */
+    .toast {
+      position: fixed;
+      z-index: 300;
+      left: 50%;
+      bottom: calc(92px + env(safe-area-inset-bottom));
+      max-width: calc(100% - 36px);
+      padding: 9px 15px;
+      color: #fff;
+      background: rgba(35, 59, 74, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      box-shadow: 0 8px 24px rgba(26, 46, 58, 0.18);
+      font-size: 12px;
+      line-height: 1.5;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transform: translate(-50%, 6px);
+      transition: opacity 180ms ease, transform 180ms ease, visibility 180ms linear;
+    }
+    .toast.is-visible {
+      opacity: 1;
+      visibility: visible;
+      transform: translate(-50%, 0);
+      transition: opacity 180ms ease, transform 180ms ease, visibility 0s linear;
+    }
+    .noscript-note {
+      margin: 20px;
+      padding: 16px;
+      color: var(--danger);
+      background: var(--danger-soft);
+      border: 1px solid #f0ddda;
+      border-radius: 12px;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    /* ===== 响应式 ===== */
+    @media (max-width: 359px) {
+      .page { padding-left: 14px; padding-right: 14px; }
+      .current-card, .goal-card, .trend-card, .stats-card { padding-left: 17px; padding-right: 17px; }
+      .current-weight-line { gap: 7px; }
+      .weight-value { font-size: 57px; }
+      .form-row { grid-template-columns: minmax(0, 1fr); }
+      .range-button { min-width: 40px; padding: 0 5px; }
+      .goal-metrics { flex-direction: column; gap: 4px; }
+      .history-row { padding-left: 16px; padding-right: 16px; }
+      .date-heading { padding-left: 16px; padding-right: 16px; }
+      .settings-content { padding-left: 14px; padding-right: 14px; }
+    }
+    @media (min-width: 700px) {
+      .page { padding-left: 22px; padding-right: 22px; }
+      .settings-view { background: rgba(31, 51, 64, 0.26); }
+      .settings-panel { border-left: 1px solid rgba(255, 255, 255, 0.42); border-right: 1px solid rgba(255, 255, 255, 0.42); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#mainContent">跳到主要内容</a>
+
+  <div class="app-root" id="appRoot">
+    <div class="page">
+      <header class="app-header">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4.5 18.5h15"></path>
+              <path d="M7 18.5v-5.2a5 5 0 0 1 10 0v5.2"></path>
+              <path d="M12 13.3l2.7-3.4"></path>
+              <circle cx="12" cy="13.3" r="1.05" fill="currentColor" stroke="none"></circle>
+            </svg>
+          </span>
+          <h1>轻秤</h1>
+        </div>
+        <button class="icon-button" id="settingsButton" type="button" aria-label="打开设置">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.2 14.7a1.7 1.7 0 0 0 .34 1.87l.05.05a2.06 2.06 0 1 1-2.92 2.92l-.05-.05a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56v.09a2.06 2.06 0 1 1-4.12 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.05.05a2.06 2.06 0 1 1-2.92-2.92l.05-.05a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03h-.09a2.06 2.06 0 1 1 0-4.12h.09a1.7 1.7 0 0 0 1.56-1.11 1.7 1.7 0 0 0-.34-1.87l-.05-.05a2.06 2.06 0 1 1 2.92-2.92l.05.05a1.7 1.7 0 0 0 1.87.34h.08a1.7 1.7 0 0 0 1.03-1.56v-.09a2.06 2.06 0 1 1 4.12 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.05-.05a2.06 2.06 0 1 1 2.92 2.92l-.05.05a1.7 1.7 0 0 0-.34 1.87v.08a1.7 1.7 0 0 0 1.56 1.03h.09a2.06 2.06 0 1 1 0 4.12h-.09a1.7 1.7 0 0 0-1.56 1.03z"></path>
+          </svg>
+        </button>
+      </header>
+
+      <main class="main" id="mainContent">
+        <section class="card current-card" id="currentCard" aria-labelledby="currentHeading"></section>
+        <section class="card goal-card" id="goalCard" aria-labelledby="goalHeading" hidden></section>
+
+        <section class="card trend-card" aria-labelledby="trendHeading">
+          <div class="card-head">
+            <h2 class="card-title" id="trendHeading">趋势</h2>
+            <div class="range-switch" id="rangeSwitch" role="group" aria-label="趋势时间范围">
+              <button class="range-button" type="button" data-range="7" aria-pressed="true">7 天</button>
+              <button class="range-button" type="button" data-range="30" aria-pressed="false">30 天</button>
+              <button class="range-button" type="button" data-range="90" aria-pressed="false">90 天</button>
+            </div>
+          </div>
+          <div class="trend-body" id="trendBody"></div>
+        </section>
+
+        <section class="card stats-card" aria-labelledby="statsHeading">
+          <h2 class="card-title" id="statsHeading">统计</h2>
+          <div class="stats-grid" id="statsGrid"></div>
+        </section>
+
+        <section class="history-section" aria-labelledby="historyHeading">
+          <div class="section-head">
+            <h2 id="historyHeading">历史记录</h2>
+            <span class="section-count" id="historyCount"></span>
+          </div>
+          <div class="card history-card" id="historyCard"></div>
+        </section>
+
+        <p class="page-footnote">体重数据仅保存在此设备</p>
+      </main>
+    </div>
+
+    <div class="dock">
+      <div class="dock-inner">
+        <button class="primary-button cta" id="addRecordButton" type="button">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+            <path d="M10 4v12M4 10h12"></path>
+          </svg>
+          记录体重
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-view" id="settingsView" hidden>
+    <section class="settings-panel" id="settingsPanel" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <header class="settings-header">
+        <button class="icon-button" id="settingsBackButton" type="button" aria-label="返回首页">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M15 5l-7 7 7 7"></path>
+          </svg>
+        </button>
+        <h2 id="settingsTitle">设置</h2>
+        <span aria-hidden="true"></span>
+      </header>
+
+      <div class="settings-content" id="settingsContent">
+        <section class="settings-section" aria-labelledby="goalSettingsHeading">
+          <div class="settings-section-title-row">
+            <h3 id="goalSettingsHeading">身体目标</h3>
+          </div>
+          <div class="settings-card">
+            <label class="setting-row" for="goalInput">
+              <span class="setting-label">目标体重</span>
+              <span class="setting-entry">
+                <input class="setting-input" id="goalInput" type="text" inputmode="decimal" autocomplete="off" placeholder="未设置" aria-describedby="goalSettingsNote">
+                <span class="setting-unit" id="goalUnitSuffix">kg</span>
+              </span>
+            </label>
+            <label class="setting-row" for="startInput">
+              <span class="setting-label">起始体重</span>
+              <span class="setting-entry">
+                <input class="setting-input" id="startInput" type="text" inputmode="decimal" autocomplete="off" placeholder="自动" aria-describedby="goalSettingsNote">
+                <span class="setting-unit" id="startUnitSuffix">kg</span>
+              </span>
+            </label>
+            <p class="setting-note" id="goalSettingsNote">目标留空时不显示进度；起始留空时自动使用最早一条记录。</p>
+          </div>
+          <p class="settings-error" id="settingsError" role="alert" hidden></p>
+        </section>
+
+        <section class="settings-section" aria-labelledby="unitSettingsHeading">
+          <div class="settings-section-title-row">
+            <h3 id="unitSettingsHeading">显示单位</h3>
+          </div>
+          <div class="settings-card unit-card">
+            <div class="unit-toggle" id="unitToggle" role="group" aria-label="体重显示单位">
+              <button type="button" data-unit="kg" aria-pressed="true">公斤</button>
+              <button type="button" data-unit="jin" aria-pressed="false">斤</button>
+            </div>
+            <p class="setting-note inline">切换后立即生效；仅改变显示，数据始终按公斤保存。</p>
+          </div>
+        </section>
+
+        <section class="settings-section" aria-labelledby="dataSettingsHeading">
+          <div class="settings-section-title-row">
+            <h3 id="dataSettingsHeading">数据</h3>
+            <span class="section-meta" id="dataSummary">本机暂无记录</span>
+          </div>
+          <div class="settings-card data-card">
+            <button class="data-action" id="exportButton" type="button">
+              <span>导出 JSON 备份</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 4v11"></path>
+                <path d="M8 11l4 4 4-4"></path>
+                <path d="M5 19h14"></path>
+              </svg>
+            </button>
+            <button class="data-action" id="importButton" type="button">
+              <span>导入 JSON 备份</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 15V4"></path>
+                <path d="M8 8l4-4 4 4"></path>
+                <path d="M5 19h14"></path>
+              </svg>
+            </button>
+            <button class="data-action is-danger" id="clearDataButton" type="button">
+              <span>清空体重数据</span>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 7h14"></path>
+                <path d="M9 7V5h6v2"></path>
+                <path d="M7 7l.8 12h8.4L17 7"></path>
+              </svg>
+            </button>
+          </div>
+          <p class="data-status" id="dataStatus" role="status" aria-live="polite" hidden></p>
+          <p class="settings-footnote">数据只保存在当前浏览器中，不会上传。建议定期导出备份。</p>
+        </section>
+
+        <input type="file" id="importFileInput" accept="application/json,.json" hidden>
+      </div>
+
+      <footer class="settings-footer">
+        <button class="primary-button" id="saveSettingsButton" type="button">保存设置</button>
+      </footer>
+    </section>
+  </div>
+
+  <div class="overlay" id="recordLayer" hidden>
+    <div class="overlay-backdrop" id="recordBackdrop"></div>
+    <section class="sheet" id="recordDialog" role="dialog" aria-modal="true" aria-labelledby="recordTitle">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="sheet-header">
+        <h2 id="recordTitle">记录体重</h2>
+        <button class="icon-button" id="recordCloseButton" type="button" aria-label="关闭">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18"></path>
+          </svg>
+        </button>
+      </div>
+      <form class="record-form" id="recordForm" novalidate>
+        <div class="form-field">
+          <label for="weightInput">体重</label>
+          <div class="weight-entry" id="weightEntry">
+            <input id="weightInput" type="text" inputmode="decimal" autocomplete="off" placeholder="例如 65.4" required aria-describedby="weightHint weightError weightUnitSuffix">
+            <span class="input-unit" id="weightUnitSuffix">kg</span>
+          </div>
+          <p class="field-hint" id="weightHint">一位小数，20.0–300.0 kg</p>
+          <p class="field-error" id="weightError" role="alert" hidden></p>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label for="dateInput">日期</label>
+            <input class="form-input" id="dateInput" type="date" autocomplete="off" required aria-describedby="timeHint timeError">
+          </div>
+          <div class="form-field">
+            <label for="timeInput">时间</label>
+            <input class="form-input" id="timeInput" type="time" autocomplete="off" required aria-describedby="timeHint timeError">
+          </div>
+        </div>
+        <p class="field-hint" id="timeHint">按北京时间记录</p>
+        <p class="field-error" id="timeError" role="alert" hidden></p>
+        <div class="form-field">
+          <label for="noteInput">备注 <span class="label-optional">选填</span></label>
+          <input class="form-input" id="noteInput" type="text" maxlength="200" autocomplete="off" placeholder="例如：晨起空腹">
+        </div>
+        <p class="form-error" id="formError" role="alert" hidden></p>
+        <div class="sheet-actions">
+          <button class="primary-button save-button" id="saveRecordButton" type="submit">保存记录</button>
+          <button class="delete-link" id="deleteRecordButton" type="button" hidden>删除这条记录</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <div class="overlay confirm-layer" id="confirmLayer" hidden>
+    <div class="overlay-backdrop" id="confirmBackdrop"></div>
+    <section class="confirm-dialog" id="confirmDialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmMessage">
+      <h2 id="confirmTitle">确认操作</h2>
+      <p class="confirm-message" id="confirmMessage"></p>
+      <p class="confirm-error" id="confirmError" role="alert" hidden></p>
+      <div class="confirm-actions">
+        <button class="secondary-button" id="confirmCancelButton" type="button">取消</button>
+        <button class="confirm-accept" id="confirmAcceptButton" type="button">确认</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <noscript>
+    <p class="noscript-note">轻秤需要 JavaScript 才能记录和保存数据，请在浏览器设置中启用后重新打开。</p>
+  </noscript>
+
+  <script>
+    (() => {
+      'use strict';
+
+      /* ============================================================
+       * 常量与基础工具
+       * 数据始终以「整数克」保存；展示时才换算成公斤或斤。
+       * 所有“今天/现在”都取 Asia/Shanghai，不使用设备时区。
+       * ============================================================ */
+      const TIME_ZONE = 'Asia/Shanghai';
+      const STORAGE_KEY = 'weight-v1';
+      const SCHEMA_VERSION = 1;
+      const BACKUP_FORMAT = 'qingcheng-weight-backup';
+      const MIN_GRAMS = 20000;
+      const MAX_GRAMS = 300000;
+      const NOTE_MAX_LENGTH = 200;
+      const MAX_RECORDS = 20000;
+      const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
+      const RANGE_OPTIONS = [7, 30, 90];
+      const DAY_MS = 86400000;
+      const UNITS = {
+        kg: { factor: 1000, min: 20, max: 300, suffix: 'kg', label: '公斤' },
+        jin: { factor: 500, min: 40, max: 600, suffix: '斤', label: '斤' }
+      };
+
+      const beijingFormatter = new Intl.DateTimeFormat('en-GB', {
+        timeZone: TIME_ZONE,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23'
+      });
+
+      const byId = (id) => document.getElementById(id);
+      const dom = {
+        appRoot: byId('appRoot'),
+        skipLink: document.querySelector('.skip-link'),
+        settingsButton: byId('settingsButton'),
+        currentCard: byId('currentCard'),
+        goalCard: byId('goalCard'),
+        trendBody: byId('trendBody'),
+        rangeSwitch: byId('rangeSwitch'),
+        statsGrid: byId('statsGrid'),
+        historyCard: byId('historyCard'),
+        historyCount: byId('historyCount'),
+        addRecordButton: byId('addRecordButton'),
+
+        settingsView: byId('settingsView'),
+        settingsPanel: byId('settingsPanel'),
+        settingsBackButton: byId('settingsBackButton'),
+        settingsContent: byId('settingsContent'),
+        goalInput: byId('goalInput'),
+        startInput: byId('startInput'),
+        goalUnitSuffix: byId('goalUnitSuffix'),
+        startUnitSuffix: byId('startUnitSuffix'),
+        unitToggle: byId('unitToggle'),
+        settingsError: byId('settingsError'),
+        saveSettingsButton: byId('saveSettingsButton'),
+        dataSummary: byId('dataSummary'),
+        exportButton: byId('exportButton'),
+        importButton: byId('importButton'),
+        importFileInput: byId('importFileInput'),
+        clearDataButton: byId('clearDataButton'),
+        dataStatus: byId('dataStatus'),
+
+        recordLayer: byId('recordLayer'),
+        recordBackdrop: byId('recordBackdrop'),
+        recordDialog: byId('recordDialog'),
+        recordTitle: byId('recordTitle'),
+        recordCloseButton: byId('recordCloseButton'),
+        recordForm: byId('recordForm'),
+        weightEntry: byId('weightEntry'),
+        weightInput: byId('weightInput'),
+        weightUnitSuffix: byId('weightUnitSuffix'),
+        weightHint: byId('weightHint'),
+        weightError: byId('weightError'),
+        dateInput: byId('dateInput'),
+        timeInput: byId('timeInput'),
+        timeError: byId('timeError'),
+        noteInput: byId('noteInput'),
+        formError: byId('formError'),
+        saveRecordButton: byId('saveRecordButton'),
+        deleteRecordButton: byId('deleteRecordButton'),
+
+        confirmLayer: byId('confirmLayer'),
+        confirmBackdrop: byId('confirmBackdrop'),
+        confirmDialog: byId('confirmDialog'),
+        confirmTitle: byId('confirmTitle'),
+        confirmMessage: byId('confirmMessage'),
+        confirmError: byId('confirmError'),
+        confirmCancelButton: byId('confirmCancelButton'),
+        confirmAcceptButton: byId('confirmAcceptButton'),
+
+        toast: byId('toast')
+      };
+
+      let state = createDefaultState();
+      let trendRange = 7;
+      let recordMode = 'create';
+      let editingRecordId = null;
+      let isSavingRecord = false;
+      let recordCommitted = false;
+      let recordCloseTimer = null;
+      let settingsCloseTimer = null;
+      let confirmCloseTimer = null;
+      let settingsDraftUnit = 'kg';
+      let isSavingSettings = false;
+      let isImporting = false;
+      let confirmBusy = false;
+      let confirmConfig = null;
+      let toastTimer = null;
+      let resizeTimer = null;
+      let dayRefreshTimer = null;
+      let lastRenderedToday = '';
+      let lastFocusedBeforeRecord = null;
+      let lastFocusedBeforeSettings = null;
+      let lastFocusedBeforeConfirm = null;
+      let confirmReturnFocus = null;
+
+      function pad2(value) {
+        return String(value).padStart(2, '0');
+      }
+
+      function beijingParts(input = Date.now()) {
+        const date = input instanceof Date ? input : new Date(input);
+        const parts = {};
+        for (const part of beijingFormatter.formatToParts(date)) {
+          if (part.type !== 'literal') parts[part.type] = part.value;
+        }
+        const year = Number(parts.year);
+        const month = Number(parts.month);
+        const day = Number(parts.day);
+        const hour = Number(parts.hour) % 24;
+        const minute = Number(parts.minute);
+        const second = Number(parts.second);
+        return {
+          year,
+          month,
+          day,
+          hour,
+          minute,
+          second,
+          dateKey: `${String(year).padStart(4, '0')}-${pad2(month)}-${pad2(day)}`,
+          time: `${pad2(hour)}:${pad2(minute)}:${pad2(second)}`
+        };
+      }
+
+      function nowDateKey() {
+        return beijingParts().dateKey;
+      }
+
+      function currentBeijingISO() {
+        const parts = beijingParts();
+        return `${parts.dateKey}T${parts.time}+08:00`;
+      }
+
+      function shiftDateKey(dateKey, days) {
+        const [year, month, day] = dateKey.split('-').map(Number);
+        const date = new Date(Date.UTC(year, month - 1, day + days));
+        return `${String(date.getUTCFullYear()).padStart(4, '0')}-${pad2(date.getUTCMonth() + 1)}-${pad2(date.getUTCDate())}`;
+      }
+
+      function daysBetweenDateKeys(fromKey, toKey) {
+        const [fy, fm, fd] = fromKey.split('-').map(Number);
+        const [ty, tm, td] = toKey.split('-').map(Number);
+        return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / DAY_MS);
+      }
+
+      function isValidDateKey(dateKey) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return false;
+        const [year, month, day] = dateKey.split('-').map(Number);
+        if (year < 1900 || year > 9999 || month < 1 || month > 12 || day < 1 || day > 31) return false;
+        const date = new Date(Date.UTC(year, month - 1, day));
+        return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+      }
+
+      function isValidRecordAt(value) {
+        if (typeof value !== 'string') return false;
+        const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})\+08:00$/.exec(value);
+        if (!match) return false;
+        if (!isValidDateKey(match[1])) return false;
+        const hour = Number(match[2]);
+        const minute = Number(match[3]);
+        const second = Number(match[4]);
+        if (hour > 23 || minute > 59 || second > 59) return false;
+        return Number.isFinite(Date.parse(value));
+      }
+
+      function recordDateKey(record) {
+        return record.at.slice(0, 10);
+      }
+
+      function recordClock(record) {
+        return record.at.slice(11, 16);
+      }
+
+      function unitConfig(unit) {
+        return UNITS[unit] || UNITS.kg;
+      }
+
+      function unitSuffix(unit) {
+        return unitConfig(unit).suffix;
+      }
+
+      function unitLabel(unit) {
+        return unitConfig(unit).label;
+      }
+
+      function formatWeightValue(grams, unit) {
+        const config = unitConfig(unit);
+        const tenths = Math.round(grams / (config.factor / 10));
+        return (tenths / 10).toFixed(1);
+      }
+
+      function formatRange(unit) {
+        const config = unitConfig(unit);
+        return `${config.min.toFixed(1)}–${config.max.toFixed(1)} ${config.suffix}`;
+      }
+
+      function formatSignedDifference(grams, unit) {
+        const abs = formatWeightValue(Math.abs(grams), unit);
+        if (grams === 0) return '0.0';
+        return `${grams > 0 ? '+' : '−'}${abs}`;
+      }
+
+      function changeDirection(diffGrams) {
+        if (diffGrams < 0) return { className: 'is-down', arrow: '↓', spoken: '下降' };
+        if (diffGrams > 0) return { className: 'is-up', arrow: '↑', spoken: '上升' };
+        return { className: 'is-flat', arrow: '', spoken: '持平' };
+      }
+
+      function formatMoment(at, todayKey) {
+        const dateKey = at.slice(0, 10);
+        const time = at.slice(11, 16);
+        if (dateKey === todayKey) return `今天 ${time}`;
+        if (dateKey === shiftDateKey(todayKey, -1)) return `昨天 ${time}`;
+        const year = Number(dateKey.slice(0, 4));
+        const month = Number(dateKey.slice(5, 7));
+        const day = Number(dateKey.slice(8, 10));
+        if (year === Number(todayKey.slice(0, 4))) return `${month}月${day}日 ${time}`;
+        return `${year}年${month}月${day}日 ${time}`;
+      }
+
+      function formatFullMoment(at) {
+        const dateKey = at.slice(0, 10);
+        const year = Number(dateKey.slice(0, 4));
+        const month = Number(dateKey.slice(5, 7));
+        const day = Number(dateKey.slice(8, 10));
+        return `${year}年${month}月${day}日 ${at.slice(11, 16)}`;
+      }
+
+      function formatGroupDate(dateKey, todayKey) {
+        const month = Number(dateKey.slice(5, 7));
+        const day = Number(dateKey.slice(8, 10));
+        const year = Number(dateKey.slice(0, 4));
+        if (dateKey === todayKey) return `今天 · ${month}月${day}日`;
+        if (dateKey === shiftDateKey(todayKey, -1)) return `昨天 · ${month}月${day}日`;
+        if (year === Number(todayKey.slice(0, 4))) return `${month}月${day}日`;
+        return `${year}年${month}月${day}日`;
+      }
+
+      function formatChartDate(dateKey, todayKey) {
+        const month = Number(dateKey.slice(5, 7));
+        const day = Number(dateKey.slice(8, 10));
+        const year = Number(dateKey.slice(0, 4));
+        if (dateKey === todayKey) return '今天';
+        if (year === Number(todayKey.slice(0, 4))) return `${month}月${day}日`;
+        return `${year}年${month}月${day}日`;
+      }
+
+      function formatShortDate(dateKey) {
+        return `${Number(dateKey.slice(5, 7))}/${Number(dateKey.slice(8, 10))}`;
+      }
+
+      function formatFullDateForAria(dateKey, todayKey) {
+        const month = Number(dateKey.slice(5, 7));
+        const day = Number(dateKey.slice(8, 10));
+        const year = Number(dateKey.slice(0, 4));
+        if (dateKey === todayKey) return `今天，${month}月${day}日`;
+        if (dateKey === shiftDateKey(todayKey, -1)) return `昨天，${month}月${day}日`;
+        if (year === Number(todayKey.slice(0, 4))) return `${month}月${day}日`;
+        return `${year}年${month}月${day}日`;
+      }
+
+      function parseWeightInput(rawValue, unit) {
+        const config = unitConfig(unit);
+        const raw = String(rawValue == null ? '' : rawValue).trim().replace(/[，,]/g, '.');
+        if (!raw) return { ok: false, error: '请输入体重。' };
+        if (!/^\d+(?:\.\d)?$/.test(raw)) {
+          return { ok: false, error: '请输入有效体重，最多保留一位小数。' };
+        }
+        const value = Number(raw);
+        if (!Number.isFinite(value) || value < config.min || value > config.max) {
+          return { ok: false, error: `请输入 ${formatRange(unit)} 之间的体重。` };
+        }
+        return { ok: true, grams: Math.round(value * config.factor) };
+      }
+
+      function parseOptionalWeight(rawValue, unit) {
+        const raw = String(rawValue == null ? '' : rawValue).trim();
+        if (!raw) return { ok: true, grams: null };
+        return parseWeightInput(raw, unit);
+      }
+
+      function parseRecordDateTime(dateValue, timeValue) {
+        if (!dateValue) return { ok: false, field: 'date', error: '请选择记录日期。' };
+        if (!isValidDateKey(dateValue)) return { ok: false, field: 'date', error: '请选择有效的记录日期。' };
+        if (!/^\d{2}:\d{2}$/.test(timeValue || '')) {
+          return { ok: false, field: 'time', error: '请选择记录时间。' };
+        }
+        const hour = Number(timeValue.slice(0, 2));
+        const minute = Number(timeValue.slice(3, 5));
+        if (hour > 23 || minute > 59) return { ok: false, field: 'time', error: '请选择有效的时间。' };
+        const at = `${dateValue}T${timeValue}:00+08:00`;
+        const timestamp = Date.parse(at);
+        if (!Number.isFinite(timestamp)) return { ok: false, field: 'time', error: '记录时间无法识别。' };
+        if (timestamp > Date.now()) return { ok: false, field: 'time', error: '记录时间不能晚于现在。' };
+        return { ok: true, at, timestamp };
+      }
+
+      function makeId() {
+        if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+          return window.crypto.randomUUID();
+        }
+        return `r-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      }
+
+      function createDefaultState() {
+        return {
+          version: SCHEMA_VERSION,
+          records: [],
+          settings: { unit: 'kg', goalGrams: null, startGrams: null }
+        };
+      }
+
+      function cloneState(source) {
+        return {
+          version: SCHEMA_VERSION,
+          records: source.records.map((record) => ({ ...record })),
+          settings: { ...source.settings }
+        };
+      }
+
+      /* ============================================================
+       * 数据校验、迁移与存储
+       * ============================================================ */
+      function normalizeSettingGrams(value, label) {
+        if (value === null || value === undefined) return null;
+        if (!Number.isInteger(value) || value < MIN_GRAMS || value > MAX_GRAMS) {
+          throw new Error(`${label}需在 20.0–300.0 公斤之间。`);
+        }
+        return value;
+      }
+
+      function normalizeState(input) {
+        if (!input || typeof input !== 'object' || Array.isArray(input)) {
+          throw new Error('数据格式不正确。');
+        }
+        if (!Array.isArray(input.records)) throw new Error('缺少体重记录列表。');
+        if (input.records.length > MAX_RECORDS) throw new Error(`记录数量超过 ${MAX_RECORDS} 条上限。`);
+        const usedIds = new Set();
+        const records = input.records.map((item, index) => {
+          const prefix = `第 ${index + 1} 条记录`;
+          if (!item || typeof item !== 'object' || Array.isArray(item)) throw new Error(`${prefix}格式不正确。`);
+          if (typeof item.id !== 'string' || !/^[A-Za-z0-9_-]{1,80}$/.test(item.id)) {
+            throw new Error(`${prefix}的编号格式不正确。`);
+          }
+          if (usedIds.has(item.id)) throw new Error(`${prefix}的编号重复。`);
+          usedIds.add(item.id);
+          if (!Number.isInteger(item.grams) || item.grams < MIN_GRAMS || item.grams > MAX_GRAMS) {
+            throw new Error(`${prefix}的体重需在 20.0–300.0 公斤之间。`);
+          }
+          if (!isValidRecordAt(item.at)) throw new Error(`${prefix}的时间格式不正确。`);
+          if (typeof item.note !== 'string' || item.note.length > NOTE_MAX_LENGTH) {
+            throw new Error(`${prefix}的备注格式不正确或超过 ${NOTE_MAX_LENGTH} 字。`);
+          }
+          let createdAt = item.createdAt;
+          if (createdAt === undefined || createdAt === null) createdAt = Date.parse(item.at);
+          if (!Number.isInteger(createdAt) || createdAt < 0) {
+            throw new Error(`${prefix}的创建时间格式不正确。`);
+          }
+          return {
+            id: item.id,
+            grams: item.grams,
+            at: item.at,
+            note: item.note,
+            createdAt
+          };
+        });
+
+        const settings = input.settings;
+        if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+          throw new Error('设置数据格式不正确。');
+        }
+        if (settings.unit !== 'kg' && settings.unit !== 'jin') {
+          throw new Error('显示单位格式不正确。');
+        }
+        return {
+          version: SCHEMA_VERSION,
+          records,
+          settings: {
+            unit: settings.unit,
+            goalGrams: normalizeSettingGrams(settings.goalGrams, '目标体重'),
+            startGrams: normalizeSettingGrams(settings.startGrams, '起始体重')
+          }
+        };
+      }
+
+      function migrateState(input) {
+        if (!input || typeof input !== 'object' || Array.isArray(input)) {
+          throw new Error('数据格式不正确。');
+        }
+        const version = Number(input.version);
+        if (!Number.isInteger(version) || version < 1) throw new Error('数据版本无效。');
+        if (version > SCHEMA_VERSION) throw new Error('数据版本高于当前应用，无法读取。');
+        // 迁移预留：未来 SCHEMA_VERSION 升级时，在这里按版本逐级升级字段后再校验。
+        if (version < SCHEMA_VERSION) {
+          // 当前 v1 是首个版本，暂无旧版迁移分支。
+        }
+        return normalizeState(input);
+      }
+
+      function readInitialState() {
+        let raw = null;
+        try {
+          raw = window.localStorage.getItem(STORAGE_KEY);
+        } catch (error) {
+          return { state: createDefaultState(), error: '本机存储暂不可用，修改可能无法保存。' };
+        }
+        if (raw === null) return { state: createDefaultState(), error: '' };
+        try {
+          return { state: migrateState(JSON.parse(raw)), error: '' };
+        } catch (error) {
+          return { state: createDefaultState(), error: '本地体重数据读取失败，已按空白数据启动。' };
+        }
+      }
+
+      function commitState(nextState) {
+        try {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
+        } catch (error) {
+          return false;
+        }
+        state = nextState;
+        return true;
+      }
+
+      /* ============================================================
+       * 派生数据
+       * ============================================================ */
+      function sortedRecordsAscending() {
+        return state.records.slice().sort((a, b) => {
+          const aTime = Date.parse(a.at);
+          const bTime = Date.parse(b.at);
+          if (aTime !== bTime) return aTime - bTime;
+          if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
+          return a.id.localeCompare(b.id);
+        });
+      }
+
+      function getPreviousMap() {
+        const sorted = sortedRecordsAscending();
+        const map = new Map();
+        sorted.forEach((record, index) => map.set(record.id, index > 0 ? sorted[index - 1] : null));
+        return map;
+      }
+
+      function getDailyLastMap() {
+        const map = new Map();
+        for (const record of sortedRecordsAscending()) {
+          map.set(recordDateKey(record), record);
+        }
+        return map;
+      }
+
+      function getDailyPointsForRange(days, todayKey) {
+        const startKey = shiftDateKey(todayKey, -(days - 1));
+        const points = [];
+        for (const [date, record] of getDailyLastMap()) {
+          if (date >= startKey && date <= todayKey) {
+            points.push({ date, record, grams: record.grams });
+          }
+        }
+        return points.sort((a, b) => a.date.localeCompare(b.date));
+      }
+
+      function getLatestRecord() {
+        const sorted = sortedRecordsAscending();
+        return sorted.length ? sorted[sorted.length - 1] : null;
+      }
+
+      function getEarliestRecord() {
+        const sorted = sortedRecordsAscending();
+        return sorted.length ? sorted[0] : null;
+      }
+
+      /* ============================================================
+       * 首页渲染
+       * ============================================================ */
+      function renderAll() {
+        renderCurrentCard();
+        renderGoalCard();
+        renderStats();
+        renderTrend();
+        renderHistory();
+        lastRenderedToday = nowDateKey();
+      }
+
+      function renderCurrentCard() {
+        const sorted = sortedRecordsAscending();
+        const latest = sorted.length ? sorted[sorted.length - 1] : null;
+        const previous = sorted.length > 1 ? sorted[sorted.length - 2] : null;
+        const todayKey = nowDateKey();
+        const unit = state.settings.unit;
+
+        if (!latest) {
+          dom.currentCard.innerHTML = `
+            <div class="current-top">
+              <h2 class="current-label" id="currentHeading">当前体重</h2>
+            </div>
+            <div class="current-weight-line">
+              <span class="weight-value is-placeholder">—</span>
+              <span class="weight-unit">${unitSuffix(unit)}</span>
+            </div>
+            <div class="current-empty">
+              <p>记录第一笔体重，开始看见变化。</p>
+              <button class="inline-action" type="button" data-open-record>记录第一笔</button>
+            </div>
+          `;
+          return;
+        }
+
+        const hasToday = state.records.some((record) => recordDateKey(record) === todayKey);
+        const todayHint = hasToday ? '' : '<span class="today-hint">今天还没记录</span>';
+        let changeMarkup = '<span class="change is-first">首次记录</span>';
+        if (previous) {
+          const diff = latest.grams - previous.grams;
+          if (diff === 0) {
+            changeMarkup = `
+              <span class="change is-flat">
+                <span class="change-caption">较上次</span>
+                <span class="change-value">持平 0.0 ${unitSuffix(unit)}</span>
+              </span>
+            `;
+          } else {
+            const direction = changeDirection(diff);
+            changeMarkup = `
+              <span class="change ${direction.className}">
+                <span class="change-caption">较上次</span>
+                <span class="change-value"><span aria-hidden="true">${direction.arrow}</span><span class="sr-only">${direction.spoken}</span> ${formatWeightValue(Math.abs(diff), unit)} ${unitSuffix(unit)}</span>
+              </span>
+            `;
+          }
+        }
+
+        dom.currentCard.innerHTML = `
+          <div class="current-top">
+            <h2 class="current-label" id="currentHeading">当前体重</h2>
+            ${todayHint}
+          </div>
+          <div class="current-weight-line" aria-label="当前体重 ${formatWeightValue(latest.grams, unit)} ${unitLabel(unit)}">
+            <span class="weight-value">${formatWeightValue(latest.grams, unit)}</span>
+            <span class="weight-unit">${unitSuffix(unit)}</span>
+          </div>
+          <div class="current-meta">
+            ${changeMarkup}
+            <span class="meta-dot" aria-hidden="true"></span>
+            <span class="record-time"><time datetime="${latest.at}">${formatMoment(latest.at, todayKey)}</time></span>
+          </div>
+        `;
+      }
+
+      function renderGoalCard() {
+        const latest = getLatestRecord();
+        const earliest = getEarliestRecord();
+        const target = state.settings.goalGrams;
+        const start = state.settings.startGrams !== null
+          ? state.settings.startGrams
+          : (earliest ? earliest.grams : null);
+
+        if (target === null || !latest || start === null) {
+          dom.goalCard.hidden = true;
+          dom.goalCard.innerHTML = '';
+          dom.goalCard.classList.remove('is-complete');
+          return;
+        }
+
+        const unit = state.settings.unit;
+        let achieved = false;
+        if (target < start) achieved = latest.grams <= target;
+        else if (target > start) achieved = latest.grams >= target;
+        else achieved = latest.grams === target;
+
+        let progress = 0;
+        if (target !== start) {
+          progress = (latest.grams - start) / (target - start);
+        } else if (achieved) {
+          progress = 1;
+        }
+        progress = Math.max(0, Math.min(1, progress));
+        if (achieved) progress = 1;
+        const percent = Math.round(progress * 100);
+
+        const fromStart = latest.grams - start;
+        let changeMarkup = '';
+        if (fromStart === 0) {
+          changeMarkup = `<span class="goal-change is-flat">较起始 <b>0.0 ${unitSuffix(unit)}</b></span>`;
+        } else {
+          const direction = changeDirection(fromStart);
+          changeMarkup = `
+            <span class="goal-change ${direction.className}">
+              较起始 <span aria-hidden="true">${direction.arrow}</span><span class="sr-only">${direction.spoken}</span>
+              <b>${formatWeightValue(Math.abs(fromStart), unit)} ${unitSuffix(unit)}</b>
+            </span>
+          `;
+        }
+
+        const remaining = Math.abs(latest.grams - target);
+        const remainingMarkup = achieved
+          ? ''
+          : `<span class="goal-remaining">还差 ${formatWeightValue(remaining, unit)} ${unitSuffix(unit)}</span>`;
+        const achievedMarkup = achieved
+          ? `<span class="goal-achieved"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5l4 4 8-9"></path></svg>已达成</span>`
+          : '';
+        const ariaValueText = achieved
+          ? `目标已达成，起始 ${formatWeightValue(start, unit)} ${unitLabel(unit)}，目标 ${formatWeightValue(target, unit)} ${unitLabel(unit)}`
+          : `已完成 ${percent}%，还差 ${formatWeightValue(remaining, unit)} ${unitLabel(unit)}`;
+
+        dom.goalCard.hidden = false;
+        dom.goalCard.classList.toggle('is-complete', achieved);
+        dom.goalCard.innerHTML = `
+          <div class="goal-head">
+            <h2 class="card-title" id="goalHeading">目标进度</h2>
+            ${achievedMarkup}
+          </div>
+          <div class="goal-bar" role="progressbar" aria-label="目标进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}" aria-valuetext="${ariaValueText}">
+            <span class="goal-fill" style="width: ${percent}%"></span>
+          </div>
+          <div class="goal-scale">
+            <span>起始 <b>${formatWeightValue(start, unit)} ${unitSuffix(unit)}</b></span>
+            <span>目标 <b>${formatWeightValue(target, unit)} ${unitSuffix(unit)}</b></span>
+          </div>
+          <div class="goal-metrics">
+            ${changeMarkup}
+            ${remainingMarkup}
+          </div>
+        `;
+      }
+
+      function renderStats() {
+        const unit = state.settings.unit;
+        const todayKey = nowDateKey();
+        const last7 = getDailyPointsForRange(7, todayKey);
+        const last30 = getDailyPointsForRange(30, todayKey);
+        const average = last7.length
+          ? Math.round(last7.reduce((sum, point) => sum + point.grams, 0) / last7.length)
+          : null;
+        const change30 = last30.length >= 2
+          ? last30[last30.length - 1].grams - last30[0].grams
+          : null;
+        const dayCount = new Set(state.records.map(recordDateKey)).size;
+
+        const averageMarkup = average === null
+          ? '<span class="empty-value">—</span>'
+          : `${formatWeightValue(average, unit)}<span class="stat-unit">${unitSuffix(unit)}</span>`;
+
+        let changeMarkup;
+        if (change30 === null) {
+          changeMarkup = '<span class="empty-value">—</span>';
+        } else {
+          const direction = changeDirection(change30);
+          const className = change30 === 0 ? 'is-flat' : direction.className;
+          changeMarkup = `<span class="${className}" style="color: inherit;">${formatSignedDifference(change30, unit)}</span><span class="stat-unit">${unitSuffix(unit)}</span>`;
+        }
+
+        dom.statsGrid.innerHTML = `
+          <div class="stat">
+            <span class="stat-label">7 天平均</span>
+            <div class="stat-value">${averageMarkup}</div>
+          </div>
+          <div class="stat">
+            <span class="stat-label">30 天变化</span>
+            <div class="stat-value ${change30 === null ? '' : (change30 === 0 ? 'is-flat' : changeDirection(change30).className)}">${changeMarkup}</div>
+          </div>
+          <div class="stat">
+            <span class="stat-label">记录天数</span>
+            <div class="stat-value">${dayCount}<span class="stat-unit">天</span></div>
+          </div>
+        `;
+      }
+
+      function renderTrend() {
+        const todayKey = nowDateKey();
+        dom.rangeSwitch.querySelectorAll('[data-range]').forEach((button) => {
+          button.setAttribute('aria-pressed', String(Number(button.dataset.range) === trendRange));
+        });
+        const points = getDailyPointsForRange(trendRange, todayKey);
+        const unit = state.settings.unit;
+
+        if (!points.length) {
+          dom.trendBody.innerHTML = `
+            <div class="chart-empty">
+              <p>最近 ${trendRange} 天还没有趋势。</p>
+              <button class="inline-action" type="button" data-open-record>记录一次</button>
+            </div>
+          `;
+          return;
+        }
+
+        const maxPoint = points.reduce((best, point) => point.grams >= best.grams ? point : best, points[0]);
+        const minPoint = points.reduce((best, point) => point.grams <= best.grams ? point : best, points[0]);
+        const latestPoint = points[points.length - 1];
+
+        dom.trendBody.innerHTML = `
+          <div class="chart-holder" id="chartHolder"></div>
+          <div class="trend-summary">
+            <span class="summary-item"><span class="summary-dot max" aria-hidden="true"></span>最高 <b>${formatWeightValue(maxPoint.grams, unit)}</b> ${unitSuffix(unit)}</span>
+            <span class="summary-item"><span class="summary-dot min" aria-hidden="true"></span>最低 <b>${formatWeightValue(minPoint.grams, unit)}</b> ${unitSuffix(unit)}</span>
+            <span class="summary-item"><span class="summary-dot latest" aria-hidden="true"></span>最近 <b>${formatWeightValue(latestPoint.grams, unit)}</b> ${unitSuffix(unit)}</span>
+          </div>
+        `;
+        drawTrendChart(points, { maxPoint, minPoint, latestPoint, unit, todayKey });
+      }
+
+      function drawTrendChart(points, meta) {
+        const holder = byId('chartHolder');
+        if (!holder) return;
+        const width = Math.round(holder.getBoundingClientRect().width);
+        if (width < 80) {
+          if (!holder.dataset.retried) {
+            holder.dataset.retried = '1';
+            window.requestAnimationFrame(() => drawTrendChart(points, meta));
+          }
+          return;
+        }
+
+        const height = 176;
+        const padLeft = 40;
+        const padRight = 10;
+        const plotTop = 12;
+        const plotBottom = height - 27;
+        const plotWidth = Math.max(40, width - padLeft - padRight);
+        const plotHeight = plotBottom - plotTop;
+        const todayKey = meta.todayKey;
+        const startKey = shiftDateKey(todayKey, -(trendRange - 1));
+
+        let rawMin = Math.min(...points.map((point) => point.grams));
+        let rawMax = Math.max(...points.map((point) => point.grams));
+        const rawSpan = rawMax - rawMin;
+        let pad = rawSpan === 0 ? 200 : Math.max(100, Math.round(rawSpan * 0.18));
+        let yMin = Math.max(0, rawMin - pad);
+        let yMax = rawMax + pad;
+        if (yMax - yMin < 200) {
+          const middle = (yMin + yMax) / 2;
+          yMin = Math.max(0, middle - 100);
+          yMax = middle + 100;
+        }
+
+        const xFor = (dateKey) => padLeft + (daysBetweenDateKeys(startKey, dateKey) / (trendRange - 1)) * plotWidth;
+        const yFor = (grams) => plotTop + (1 - ((grams - yMin) / (yMax - yMin))) * plotHeight;
+        const xText = (value) => value.toFixed(2);
+        const yText = (value) => value.toFixed(2);
+        const valueLabel = (grams) => formatWeightValue(grams, meta.unit);
+        const suffix = unitSuffix(meta.unit);
+        const spokenUnit = unitLabel(meta.unit);
+
+        const ticks = [yMax, (yMax + yMin) / 2, yMin];
+        const gridMarkup = ticks.map((value, index) => {
+          const y = plotTop + (index * plotHeight) / 2;
+          return `
+            <line class="chart-grid" x1="${padLeft}" y1="${yText(y)}" x2="${xText(width - padRight)}" y2="${yText(y)}"></line>
+            <text class="chart-axis" x="${padLeft - 8}" y="${yText(y + 3.5)}" text-anchor="end">${valueLabel(Math.round(value))}</text>
+          `;
+        }).join('');
+
+        const coords = points.map((point) => ({
+          ...point,
+          x: xFor(point.date),
+          y: yFor(point.grams)
+        }));
+        const linePath = coords.map((point, index) => `${index === 0 ? 'M' : 'L'}${xText(point.x)} ${yText(point.y)}`).join(' ');
+        const areaPath = coords.length > 1
+          ? `${linePath} L${xText(coords[coords.length - 1].x)} ${yText(plotBottom)} L${xText(coords[0].x)} ${yText(plotBottom)} Z`
+          : '';
+
+        const dotMarkup = coords.map((point) => {
+          const title = `${formatFullDateForAria(point.date, todayKey)}，${valueLabel(point.grams)} ${spokenUnit}`;
+          return `<circle class="chart-dot" cx="${xText(point.x)}" cy="${yText(point.y)}" r="2.5"><title>${title}</title></circle>`;
+        }).join('');
+
+        const maxX = xText(xFor(meta.maxPoint.date));
+        const maxY = yText(yFor(meta.maxPoint.grams));
+        const minX = xText(xFor(meta.minPoint.date));
+        const minY = yText(yFor(meta.minPoint.grams));
+        const latestX = xText(xFor(meta.latestPoint.date));
+        const latestY = yText(yFor(meta.latestPoint.grams));
+
+        const middleDate = shiftDateKey(startKey, Math.floor((trendRange - 1) / 2));
+        const xLabels = `
+          <text class="chart-date" x="${padLeft}" y="${height - 7}" text-anchor="start">${formatShortDate(startKey)}</text>
+          <text class="chart-date" x="${xText(width / 2)}" y="${height - 7}" text-anchor="middle">${formatShortDate(middleDate)}</text>
+          <text class="chart-date" x="${xText(width - padRight)}" y="${height - 7}" text-anchor="end">今天</text>
+        `;
+
+        const ariaDescription = `最近 ${trendRange} 天，最高 ${valueLabel(meta.maxPoint.grams)} ${spokenUnit}（${formatChartDate(meta.maxPoint.date, todayKey)}），最低 ${valueLabel(meta.minPoint.grams)} ${spokenUnit}（${formatChartDate(meta.minPoint.date, todayKey)}），最近一次 ${valueLabel(meta.latestPoint.grams)} ${spokenUnit}（${formatChartDate(meta.latestPoint.date, todayKey)}）。`;
+
+        holder.innerHTML = `
+          <svg class="trend-svg" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="trendSvgTitle trendSvgDesc">
+            <title id="trendSvgTitle">最近 ${trendRange} 天体重趋势</title>
+            <desc id="trendSvgDesc">${ariaDescription}</desc>
+            <defs>
+              <linearGradient id="trendAreaFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#7ca3b8" stop-opacity="0.17"></stop>
+                <stop offset="100%" stop-color="#7ca3b8" stop-opacity="0"></stop>
+              </linearGradient>
+            </defs>
+            ${gridMarkup}
+            ${areaPath ? `<path d="${areaPath}" fill="url(#trendAreaFill)"></path>` : ''}
+            ${coords.length > 1 ? `<path class="chart-line" d="${linePath}"></path>` : ''}
+            ${dotMarkup}
+            <circle class="chart-extreme" cx="${maxX}" cy="${maxY}" r="5.1" stroke="#b18a67"><title>最高 ${valueLabel(meta.maxPoint.grams)} ${suffix}</title></circle>
+            <circle class="chart-extreme" cx="${minX}" cy="${minY}" r="5.1" stroke="#658f8a"><title>最低 ${valueLabel(meta.minPoint.grams)} ${suffix}</title></circle>
+            <circle class="chart-halo" cx="${latestX}" cy="${latestY}" r="7.5"></circle>
+            <circle class="chart-latest-dot" cx="${latestX}" cy="${latestY}" r="3.7"><title>最近一次 ${valueLabel(meta.latestPoint.grams)} ${suffix}</title></circle>
+            ${xLabels}
+          </svg>
+        `;
+      }
+
+      function renderHistory() {
+        const todayKey = nowDateKey();
+        const sorted = sortedRecordsAscending();
+        const descending = sorted.slice().reverse();
+        const previousMap = getPreviousMap();
+        const unit = state.settings.unit;
+        dom.historyCount.textContent = `共 ${sorted.length} 条`;
+
+        if (!descending.length) {
+          dom.historyCard.innerHTML = `
+            <div class="history-empty">
+              <p>还没有体重记录。</p>
+              <button class="inline-action" type="button" data-open-record>记录第一笔</button>
+            </div>
+          `;
+          return;
+        }
+
+        const groups = new Map();
+        for (const record of descending) {
+          const key = recordDateKey(record);
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key).push(record);
+        }
+
+        dom.historyCard.textContent = '';
+        for (const [dateKey, records] of groups) {
+          const group = document.createElement('section');
+          group.className = 'history-group';
+
+          const heading = document.createElement('h3');
+          heading.className = 'date-heading';
+          const headingDate = document.createElement('span');
+          headingDate.textContent = formatGroupDate(dateKey, todayKey);
+          const headingCount = document.createElement('span');
+          headingCount.textContent = `${records.length} 条`;
+          heading.append(headingDate, headingCount);
+          group.append(heading);
+
+          for (const record of records) {
+            const previous = previousMap.get(record.id) || null;
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'history-row';
+            button.dataset.recordId = record.id;
+
+            const main = document.createElement('span');
+            main.className = 'history-main';
+            const time = document.createElement('span');
+            time.className = 'history-time';
+            time.textContent = recordClock(record);
+            main.append(time);
+            if (record.note) {
+              const note = document.createElement('span');
+              note.className = 'history-note';
+              // 备注一律用 textContent 写入，绝不拼进 innerHTML。
+              note.textContent = record.note;
+              main.append(note);
+            }
+
+            const figures = document.createElement('span');
+            figures.className = 'history-figures';
+            const weightLine = document.createElement('span');
+            weightLine.className = 'history-weight-line';
+            const weight = document.createElement('span');
+            weight.className = 'history-weight';
+            weight.textContent = formatWeightValue(record.grams, unit);
+            const weightUnit = document.createElement('span');
+            weightUnit.className = 'history-unit';
+            weightUnit.textContent = unitSuffix(unit);
+            weightLine.append(weight, weightUnit);
+
+            const change = document.createElement('span');
+            change.className = 'history-change';
+            if (previous) {
+              const diff = record.grams - previous.grams;
+              const direction = changeDirection(diff);
+              change.classList.add(diff === 0 ? 'is-flat' : direction.className);
+              change.textContent = diff === 0
+                ? '持平'
+                : `${direction.arrow} ${formatWeightValue(Math.abs(diff), unit)} ${unitSuffix(unit)}`;
+            } else {
+              change.classList.add('is-first');
+              change.textContent = '首次记录';
+            }
+
+            figures.append(weightLine, change);
+            button.append(main, figures);
+
+            const ariaParts = [
+              `${formatFullDateForAria(dateKey, todayKey)} ${recordClock(record)}`,
+              `体重 ${formatWeightValue(record.grams, unit)} ${unitLabel(unit)}`
+            ];
+            if (previous) {
+              const diff = record.grams - previous.grams;
+              ariaParts.push(diff === 0 ? '与上一次持平' : `较上一次${diff < 0 ? '下降' : '上升'} ${formatWeightValue(Math.abs(diff), unit)} ${unitLabel(unit)}`);
+            } else {
+              ariaParts.push('首次记录');
+            }
+            if (record.note) ariaParts.push(`备注：${record.note}`);
+            ariaParts.push('轻点编辑或删除');
+            button.setAttribute('aria-label', ariaParts.join('，'));
+
+            group.append(button);
+          }
+          dom.historyCard.append(group);
+        }
+      }
+
+      /* ============================================================
+       * Toast / 无障碍辅助
+       * ============================================================ */
+      function showToast(message, duration = 2600) {
+        window.clearTimeout(toastTimer);
+        dom.toast.textContent = message;
+        dom.toast.classList.remove('is-visible');
+        // 强制一帧，让相同位置连续 toast 也能重新播放淡入。
+        void dom.toast.offsetWidth;
+        dom.toast.classList.add('is-visible');
+        toastTimer = window.setTimeout(() => {
+          dom.toast.classList.remove('is-visible');
+        }, duration);
+      }
+
+      function setInert(element, value) {
+        if (!element) return;
+        if (value) element.setAttribute('inert', '');
+        else element.removeAttribute('inert');
+        try {
+          element.inert = Boolean(value);
+        } catch (error) {
+          // 不支持 inert 的浏览器仍由焦点陷阱兜底。
+        }
+      }
+
+      function syncLayerState() {
+        const settingsOpen = !dom.settingsView.hidden;
+        const recordOpen = !dom.recordLayer.hidden;
+        const confirmOpen = !dom.confirmLayer.hidden;
+        const anyOpen = settingsOpen || recordOpen || confirmOpen;
+
+        setInert(dom.appRoot, anyOpen);
+        setInert(dom.skipLink, anyOpen);
+        setInert(dom.settingsView, confirmOpen);
+        setInert(dom.recordLayer, confirmOpen);
+        setInert(dom.confirmLayer, false);
+        document.body.classList.toggle('modal-open', anyOpen);
+      }
+
+      function focusElement(element) {
+        if (!element || typeof element.focus !== 'function') return;
+        window.requestAnimationFrame(() => {
+          if (!document.contains(element) || element.disabled) return;
+          if (element.closest('[hidden]')) return;
+          try {
+            element.focus({ preventScroll: true });
+          } catch (error) {
+            try { element.focus(); } catch (focusError) { /* noop */ }
+          }
+        });
+      }
+
+      function restoreFocus(element) {
+        const fallback = dom.addRecordButton;
+        focusElement(element && document.contains(element) && !element.disabled ? element : fallback);
+      }
+
+      function motionDelay(milliseconds) {
+        return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          ? 0
+          : milliseconds;
+      }
+
+      function getTopLayerDialog() {
+        if (!dom.confirmLayer.hidden) return dom.confirmDialog;
+        if (!dom.recordLayer.hidden) return dom.recordDialog;
+        if (!dom.settingsView.hidden) return dom.settingsPanel;
+        return null;
+      }
+
+      function getFocusableElements(container) {
+        const selector = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+        return Array.from(container.querySelectorAll(selector)).filter((element) => {
+          if (element.closest('[inert]')) return false;
+          return Boolean(element.getClientRects().length);
+        });
+      }
+
+      /* ============================================================
+       * 记录体重面板
+       * ============================================================ */
+      function setRecordErrorState(type, message) {
+        if (type === 'weight') {
+          dom.weightError.textContent = message;
+          dom.weightError.hidden = false;
+          dom.weightInput.setAttribute('aria-invalid', 'true');
+          dom.weightEntry.classList.add('has-error');
+        } else if (type === 'time') {
+          dom.timeError.textContent = message;
+          dom.timeError.hidden = false;
+          dom.dateInput.setAttribute('aria-invalid', 'true');
+          dom.timeInput.setAttribute('aria-invalid', 'true');
+        } else {
+          dom.formError.textContent = message;
+          dom.formError.hidden = false;
+        }
+      }
+
+      function clearRecordErrors() {
+        dom.weightError.hidden = true;
+        dom.weightError.textContent = '';
+        dom.weightInput.removeAttribute('aria-invalid');
+        dom.weightEntry.classList.remove('has-error');
+        dom.timeError.hidden = true;
+        dom.timeError.textContent = '';
+        dom.dateInput.removeAttribute('aria-invalid');
+        dom.timeInput.removeAttribute('aria-invalid');
+        dom.formError.hidden = true;
+        dom.formError.textContent = '';
+      }
+
+      function resetSaveRecordButton() {
+        dom.saveRecordButton.disabled = false;
+        dom.saveRecordButton.removeAttribute('aria-busy');
+        dom.saveRecordButton.textContent = recordMode === 'edit' ? '保存修改' : '保存记录';
+      }
+
+      function openRecordSheet(mode, recordId, trigger) {
+        if (!dom.recordLayer.hidden || !dom.confirmLayer.hidden) return;
+        const record = mode === 'edit' ? state.records.find((item) => item.id === recordId) : null;
+        if (mode === 'edit' && !record) {
+          showToast('这条记录已不存在');
+          return;
+        }
+
+        recordMode = mode;
+        editingRecordId = record ? record.id : null;
+        lastFocusedBeforeRecord = trigger || document.activeElement;
+        isSavingRecord = false;
+        recordCommitted = false;
+
+        const unit = state.settings.unit;
+        const todayKey = nowDateKey();
+        const now = beijingParts();
+        dom.recordTitle.textContent = mode === 'edit' ? '编辑记录' : '记录体重';
+        dom.weightUnitSuffix.textContent = unitSuffix(unit);
+        dom.weightHint.textContent = `一位小数，${formatRange(unit)}`;
+        dom.weightInput.placeholder = unit === 'jin' ? '例如 130.8' : '例如 65.4';
+        dom.weightInput.value = record ? formatWeightValue(record.grams, unit) : '';
+        dom.dateInput.min = '1900-01-01';
+        dom.dateInput.max = todayKey;
+        dom.dateInput.value = record ? record.at.slice(0, 10) : now.dateKey;
+        dom.timeInput.value = record ? record.at.slice(11, 16) : `${pad2(now.hour)}:${pad2(now.minute)}`;
+        dom.noteInput.value = record ? record.note : '';
+        dom.deleteRecordButton.hidden = mode !== 'edit';
+        dom.deleteRecordButton.disabled = false;
+        clearRecordErrors();
+        resetSaveRecordButton();
+
+        if (recordCloseTimer) {
+          window.clearTimeout(recordCloseTimer);
+          recordCloseTimer = null;
+        }
+        dom.recordLayer.classList.remove('is-open');
+        dom.recordLayer.hidden = false;
+        syncLayerState();
+        dom.recordDialog.scrollTop = 0;
+        window.requestAnimationFrame(() => {
+          dom.recordLayer.classList.add('is-open');
+          dom.weightInput.focus({ preventScroll: true });
+          if (mode === 'edit') {
+            try { dom.weightInput.select(); } catch (error) { /* noop */ }
+          }
+        });
+      }
+
+      function closeRecordSheet(options = {}) {
+        if (dom.recordLayer.hidden || isSavingRecord) return;
+        if (recordCloseTimer) window.clearTimeout(recordCloseTimer);
+        dom.recordLayer.classList.remove('is-open');
+        const delay = motionDelay(245);
+        recordCloseTimer = window.setTimeout(() => {
+          dom.recordLayer.hidden = true;
+          recordCloseTimer = null;
+          syncLayerState();
+          if (options.restoreFocus !== false) restoreFocus(lastFocusedBeforeRecord);
+          if (typeof options.afterClose === 'function') options.afterClose();
+        }, delay);
+      }
+
+      function submitRecord(event) {
+        if (event) event.preventDefault();
+        if (isSavingRecord || recordCommitted) return;
+        clearRecordErrors();
+
+        const unit = state.settings.unit;
+        const weightResult = parseWeightInput(dom.weightInput.value, unit);
+        if (!weightResult.ok) {
+          setRecordErrorState('weight', weightResult.error);
+          dom.weightInput.focus();
+          return;
+        }
+
+        const timeResult = parseRecordDateTime(dom.dateInput.value, dom.timeInput.value);
+        if (!timeResult.ok) {
+          setRecordErrorState('time', timeResult.error);
+          if (timeResult.field === 'date') dom.dateInput.focus();
+          else dom.timeInput.focus();
+          return;
+        }
+
+        const note = dom.noteInput.value.trim();
+        if (note.length > NOTE_MAX_LENGTH) {
+          setRecordErrorState('form', `备注最多 ${NOTE_MAX_LENGTH} 字。`);
+          dom.noteInput.focus();
+          return;
+        }
+
+        const existing = recordMode === 'edit'
+          ? state.records.find((item) => item.id === editingRecordId)
+          : null;
+        if (recordMode === 'edit' && !existing) {
+          setRecordErrorState('form', '这条记录已不存在，请关闭后重试。');
+          return;
+        }
+
+        const record = {
+          id: existing ? existing.id : makeId(),
+          grams: weightResult.grams,
+          at: timeResult.at,
+          note,
+          createdAt: existing ? existing.createdAt : Date.now()
+        };
+
+        isSavingRecord = true;
+        dom.saveRecordButton.disabled = true;
+        dom.saveRecordButton.setAttribute('aria-busy', 'true');
+        dom.saveRecordButton.textContent = '保存中…';
+
+        try {
+          const nextState = cloneState(state);
+          if (existing) {
+            nextState.records = nextState.records.map((item) => item.id === existing.id ? record : item);
+          } else {
+            nextState.records.push(record);
+          }
+          if (!commitState(nextState)) {
+            throw new Error('无法写入本机存储');
+          }
+
+          const savedMode = recordMode;
+          const message = savedMode === 'edit'
+            ? `记录已更新 · ${formatWeightValue(record.grams, unit)} ${unitSuffix(unit)}`
+            : `已记录 · ${formatWeightValue(record.grams, unit)} ${unitSuffix(unit)}`;
+          renderAll();
+          recordCommitted = true;
+          isSavingRecord = false;
+          closeRecordSheet({
+            restoreFocus: false,
+            afterClose: () => {
+              showToast(message);
+              focusElement(dom.addRecordButton);
+            }
+          });
+        } catch (error) {
+          isSavingRecord = false;
+          resetSaveRecordButton();
+          setRecordErrorState('form', '保存失败：本机存储不可用或已满，本次记录没有保存。');
+        }
+      }
+
+      /* ============================================================
+       * 设置面板
+       * ============================================================ */
+      function clearSettingsError() {
+        dom.settingsError.hidden = true;
+        dom.settingsError.textContent = '';
+        dom.goalInput.removeAttribute('aria-invalid');
+        dom.startInput.removeAttribute('aria-invalid');
+      }
+
+      function showSettingsError(message, field) {
+        dom.settingsError.textContent = message;
+        dom.settingsError.hidden = false;
+        if (field === 'goal') {
+          dom.goalInput.setAttribute('aria-invalid', 'true');
+          dom.goalInput.focus();
+        } else if (field === 'start') {
+          dom.startInput.setAttribute('aria-invalid', 'true');
+          dom.startInput.focus();
+        }
+      }
+
+      function setDataStatus(message, tone = '') {
+        if (!message) {
+          dom.dataStatus.hidden = true;
+          dom.dataStatus.textContent = '';
+          dom.dataStatus.removeAttribute('data-tone');
+          return;
+        }
+        dom.dataStatus.textContent = message;
+        dom.dataStatus.hidden = false;
+        if (tone) dom.dataStatus.dataset.tone = tone;
+        else dom.dataStatus.removeAttribute('data-tone');
+      }
+
+      function updateDataSummary() {
+        const count = state.records.length;
+        dom.dataSummary.textContent = count ? `本机共 ${count} 条记录` : '本机暂无记录';
+        dom.clearDataButton.disabled = count === 0;
+      }
+
+      function updateStartPlaceholder() {
+        const earliest = getEarliestRecord();
+        dom.startInput.placeholder = earliest
+          ? `自动 ${formatWeightValue(earliest.grams, settingsDraftUnit)}`
+          : '自动';
+      }
+
+      function updateUnitControls() {
+        dom.unitToggle.querySelectorAll('[data-unit]').forEach((button) => {
+          button.setAttribute('aria-pressed', String(button.dataset.unit === settingsDraftUnit));
+        });
+        const suffix = unitSuffix(settingsDraftUnit);
+        dom.goalUnitSuffix.textContent = suffix;
+        dom.startUnitSuffix.textContent = suffix;
+        updateStartPlaceholder();
+      }
+
+      function fillSettingsFieldsFromState() {
+        settingsDraftUnit = state.settings.unit;
+        dom.goalInput.value = state.settings.goalGrams === null
+          ? ''
+          : formatWeightValue(state.settings.goalGrams, settingsDraftUnit);
+        dom.startInput.value = state.settings.startGrams === null
+          ? ''
+          : formatWeightValue(state.settings.startGrams, settingsDraftUnit);
+        updateUnitControls();
+        updateDataSummary();
+        clearSettingsError();
+      }
+
+      function openSettings() {
+        if (!dom.confirmLayer.hidden) return;
+        if (settingsCloseTimer) {
+          window.clearTimeout(settingsCloseTimer);
+          settingsCloseTimer = null;
+        }
+        lastFocusedBeforeSettings = document.activeElement;
+        settingsDraftUnit = state.settings.unit;
+        fillSettingsFieldsFromState();
+        setDataStatus('');
+        dom.importFileInput.value = '';
+        dom.importButton.disabled = false;
+        dom.saveSettingsButton.disabled = false;
+        dom.saveSettingsButton.textContent = '保存设置';
+        dom.settingsContent.scrollTop = 0;
+        dom.settingsView.classList.remove('is-open');
+        dom.settingsView.hidden = false;
+        syncLayerState();
+        window.requestAnimationFrame(() => {
+          dom.settingsView.classList.add('is-open');
+          dom.settingsBackButton.focus({ preventScroll: true });
+        });
+      }
+
+      function closeSettings() {
+        if (dom.settingsView.hidden || !dom.confirmLayer.hidden) return;
+        if (settingsCloseTimer) window.clearTimeout(settingsCloseTimer);
+        dom.settingsView.classList.remove('is-open');
+        const delay = motionDelay(245);
+        settingsCloseTimer = window.setTimeout(() => {
+          dom.settingsView.hidden = true;
+          settingsCloseTimer = null;
+          syncLayerState();
+          restoreFocus(lastFocusedBeforeSettings || dom.settingsButton);
+        }, delay);
+      }
+
+      function saveSettings() {
+        if (isSavingSettings) return;
+        clearSettingsError();
+        const goalResult = parseOptionalWeight(dom.goalInput.value, settingsDraftUnit);
+        if (!goalResult.ok) {
+          showSettingsError(`目标体重：${goalResult.error}`, 'goal');
+          return;
+        }
+        const startResult = parseOptionalWeight(dom.startInput.value, settingsDraftUnit);
+        if (!startResult.ok) {
+          showSettingsError(`起始体重：${startResult.error}`, 'start');
+          return;
+        }
+
+        isSavingSettings = true;
+        dom.saveSettingsButton.disabled = true;
+        dom.saveSettingsButton.textContent = '保存中…';
+        try {
+          const nextState = cloneState(state);
+          nextState.settings = {
+            unit: settingsDraftUnit,
+            goalGrams: goalResult.grams,
+            startGrams: startResult.grams
+          };
+          if (!commitState(nextState)) throw new Error('无法写入本机存储');
+          renderAll();
+          fillSettingsFieldsFromState();
+          showToast('设置已保存');
+        } catch (error) {
+          showSettingsError('保存失败：本机存储不可用或已满，设置没有保存。');
+        } finally {
+          isSavingSettings = false;
+          dom.saveSettingsButton.disabled = false;
+          dom.saveSettingsButton.textContent = '保存设置';
+        }
+      }
+
+      function changeDisplayUnit(nextUnit) {
+        if (!UNITS[nextUnit] || nextUnit === settingsDraftUnit) return;
+        const previousUnit = settingsDraftUnit;
+        const goalRaw = dom.goalInput.value;
+        const startRaw = dom.startInput.value;
+
+        const nextState = cloneState(state);
+        nextState.settings.unit = nextUnit;
+        if (!commitState(nextState)) {
+          showSettingsError('切换单位失败：本机存储不可用或已满。');
+          return;
+        }
+
+        const convertFieldValue = (input, raw) => {
+          if (!String(raw).trim()) return;
+          const parsed = parseWeightInput(raw, previousUnit);
+          if (parsed.ok) input.value = formatWeightValue(parsed.grams, nextUnit);
+        };
+        convertFieldValue(dom.goalInput, goalRaw);
+        convertFieldValue(dom.startInput, startRaw);
+
+        settingsDraftUnit = nextUnit;
+        clearSettingsError();
+        updateUnitControls();
+        renderAll();
+        showToast(`显示单位已切换为${unitLabel(nextUnit)}`);
+      }
+
+      /* ============================================================
+       * 导入 / 导出 / 清空
+       * ============================================================ */
+      function exportBackup() {
+        const now = beijingParts();
+        const payload = {
+          format: BACKUP_FORMAT,
+          version: SCHEMA_VERSION,
+          exportedAt: currentBeijingISO(),
+          data: cloneState(state)
+        };
+        const filename = `qingcheng-weight-backup-${now.dateKey.replace(/-/g, '')}-${pad2(now.hour)}${pad2(now.minute)}.json`;
+        try {
+          const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = filename;
+          link.style.display = 'none';
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          window.setTimeout(() => URL.revokeObjectURL(url), 1600);
+          showToast('JSON 备份已导出');
+        } catch (error) {
+          setDataStatus('导出失败：浏览器未能创建下载文件。', 'error');
+          showToast('导出失败');
+        }
+      }
+
+      async function handleImportFile(file) {
+        if (!file || isImporting) return;
+        isImporting = true;
+        dom.importButton.disabled = true;
+        setDataStatus('正在读取备份…');
+        try {
+          if (file.size > MAX_IMPORT_BYTES) throw new Error('备份文件超过 5 MB 上限。');
+          const text = await file.text();
+          if (dom.settingsView.hidden) return;
+
+          let payload;
+          try {
+            payload = JSON.parse(text);
+          } catch (error) {
+            throw new Error('文件不是有效的 JSON。');
+          }
+          if (!payload || typeof payload !== 'object' || payload.format !== BACKUP_FORMAT) {
+            throw new Error('这不是轻秤导出的备份文件。');
+          }
+          if (payload.version !== SCHEMA_VERSION) throw new Error('备份版本不受支持。');
+          if (!payload.data) throw new Error('备份缺少数据内容。');
+
+          let importedState;
+          try {
+            importedState = migrateState(payload.data);
+          } catch (error) {
+            throw new Error(error && error.message ? error.message : '备份数据格式不正确。');
+          }
+          if (dom.settingsView.hidden) return;
+
+          setDataStatus('');
+          const previousCount = state.records.length;
+          const importedCount = importedState.records.length;
+          openConfirm({
+            returnFocus: dom.importButton,
+            title: '导入并覆盖当前数据？',
+            message: `当前 ${previousCount} 条记录将被替换为备份中的 ${importedCount} 条记录，显示单位和目标也会一并恢复。此操作无法撤销。`,
+            acceptLabel: '导入并覆盖',
+            onConfirm: () => {
+              if (!commitState(importedState)) {
+                return { ok: false, message: '导入失败：无法写入本机存储，原数据没有改变。' };
+              }
+              renderAll();
+              settingsDraftUnit = state.settings.unit;
+              fillSettingsFieldsFromState();
+              return { ok: true };
+            },
+            onSuccess: () => {
+              updateDataSummary();
+              setDataStatus(`已导入 ${importedCount} 条记录。`, 'success');
+              showToast(`已导入 ${importedCount} 条记录`);
+              focusElement(dom.importButton);
+            }
+          });
+        } catch (error) {
+          const message = error && error.message ? error.message : '文件无法读取。';
+          setDataStatus(`导入失败：${message}`, 'error');
+          showToast('导入失败，请检查文件');
+        } finally {
+          isImporting = false;
+          dom.importButton.disabled = false;
+          dom.importFileInput.value = '';
+        }
+      }
+
+      function requestClearData() {
+        if (!state.records.length) {
+          setDataStatus('本机还没有可清空的记录。');
+          return;
+        }
+        const count = state.records.length;
+        openConfirm({
+          returnFocus: dom.clearDataButton,
+          title: '清空全部体重数据？',
+          message: `将删除本机全部 ${count} 条体重记录。目标体重、起始体重和显示单位设置会保留。此操作无法撤销。`,
+          acceptLabel: '清空数据',
+          onConfirm: () => {
+            const nextState = cloneState(state);
+            nextState.records = [];
+            if (!commitState(nextState)) {
+              return { ok: false, message: '清空失败：无法写入本机存储，原数据没有改变。' };
+            }
+            renderAll();
+            updateDataSummary();
+            updateStartPlaceholder();
+            return { ok: true };
+          },
+          onSuccess: () => {
+            updateDataSummary();
+            setDataStatus('全部体重记录已清空。', 'success');
+            showToast('体重记录已清空');
+            focusElement(dom.importButton);
+          }
+        });
+      }
+
+      function requestDeleteRecord() {
+        if (recordMode !== 'edit' || !editingRecordId) return;
+        const record = state.records.find((item) => item.id === editingRecordId);
+        if (!record) return;
+        const unit = state.settings.unit;
+        const weightText = `${formatWeightValue(record.grams, unit)} ${unitSuffix(unit)}`;
+        openConfirm({
+          returnFocus: dom.deleteRecordButton,
+          title: '删除这条记录？',
+          message: `${formatFullMoment(record.at)} · ${weightText}。删除后，当前体重、目标进度、趋势和统计会立即重新计算，且无法撤销。`,
+          acceptLabel: '删除',
+          onConfirm: () => {
+            const nextState = cloneState(state);
+            nextState.records = nextState.records.filter((item) => item.id !== record.id);
+            if (!commitState(nextState)) {
+              return { ok: false, message: '删除失败：无法写入本机存储，记录没有改变。' };
+            }
+            renderAll();
+            return { ok: true };
+          },
+          onSuccess: () => {
+            closeRecordSheet({
+              restoreFocus: false,
+              afterClose: () => {
+                showToast('记录已删除');
+                focusElement(dom.addRecordButton);
+              }
+            });
+          }
+        });
+      }
+
+      /* ============================================================
+       * 二次确认弹层
+       * ============================================================ */
+      function openConfirm(config) {
+        if (!dom.confirmLayer.hidden || !config) return;
+        if (confirmCloseTimer) {
+          window.clearTimeout(confirmCloseTimer);
+          confirmCloseTimer = null;
+        }
+        confirmConfig = config;
+        confirmBusy = false;
+        lastFocusedBeforeConfirm = document.activeElement;
+        confirmReturnFocus = config.returnFocus || lastFocusedBeforeConfirm;
+        dom.confirmTitle.textContent = config.title || '确认操作';
+        dom.confirmMessage.textContent = config.message || '';
+        dom.confirmError.hidden = true;
+        dom.confirmError.textContent = '';
+        dom.confirmAcceptButton.textContent = config.acceptLabel || '确认';
+        dom.confirmAcceptButton.disabled = false;
+        dom.confirmCancelButton.disabled = false;
+        dom.confirmLayer.classList.remove('is-open');
+        dom.confirmLayer.hidden = false;
+        syncLayerState();
+        window.requestAnimationFrame(() => {
+          dom.confirmLayer.classList.add('is-open');
+          dom.confirmCancelButton.focus({ preventScroll: true });
+        });
+      }
+
+      function closeConfirm(options = {}) {
+        if (dom.confirmLayer.hidden || confirmBusy) return;
+        if (confirmCloseTimer) window.clearTimeout(confirmCloseTimer);
+        dom.confirmLayer.classList.remove('is-open');
+        const delay = motionDelay(190);
+        confirmCloseTimer = window.setTimeout(() => {
+          dom.confirmLayer.hidden = true;
+          confirmCloseTimer = null;
+          syncLayerState();
+          const focusTarget = confirmReturnFocus;
+          confirmConfig = null;
+          if (options.restoreFocus !== false) restoreFocus(focusTarget);
+          if (typeof options.afterClose === 'function') options.afterClose();
+        }, delay);
+      }
+
+      function acceptConfirm() {
+        if (!confirmConfig || confirmBusy) return;
+        confirmBusy = true;
+        dom.confirmAcceptButton.disabled = true;
+        dom.confirmCancelButton.disabled = true;
+        dom.confirmError.hidden = true;
+
+        let result;
+        try {
+          result = confirmConfig.onConfirm ? confirmConfig.onConfirm() : { ok: true };
+        } catch (error) {
+          result = { ok: false, message: '操作失败，请重试。' };
+        }
+
+        confirmBusy = false;
+        if (!result || result.ok === false) {
+          dom.confirmAcceptButton.disabled = false;
+          dom.confirmCancelButton.disabled = false;
+          dom.confirmError.textContent = (result && result.message) || '操作失败，请重试。';
+          dom.confirmError.hidden = false;
+          return;
+        }
+
+        const success = typeof confirmConfig.onSuccess === 'function' ? confirmConfig.onSuccess : null;
+        dom.confirmAcceptButton.disabled = false;
+        dom.confirmCancelButton.disabled = false;
+        closeConfirm({
+          restoreFocus: false,
+          afterClose: success
+        });
+      }
+
+      /* ============================================================
+       * 事件绑定
+       * ============================================================ */
+      function bindEvents() {
+        dom.settingsButton.addEventListener('click', openSettings);
+        dom.settingsBackButton.addEventListener('click', closeSettings);
+        dom.saveSettingsButton.addEventListener('click', saveSettings);
+        dom.addRecordButton.addEventListener('click', () => openRecordSheet('create', null, dom.addRecordButton));
+
+        document.addEventListener('click', (event) => {
+          if (!(event.target instanceof Element)) return;
+          const trigger = event.target.closest('[data-open-record]');
+          if (!trigger) return;
+          openRecordSheet('create', null, trigger);
+        });
+
+        dom.rangeSwitch.addEventListener('click', (event) => {
+          if (!(event.target instanceof Element)) return;
+          const button = event.target.closest('[data-range]');
+          if (!button) return;
+          const nextRange = Number(button.dataset.range);
+          if (!RANGE_OPTIONS.includes(nextRange) || nextRange === trendRange) return;
+          trendRange = nextRange;
+          renderTrend();
+        });
+
+        dom.historyCard.addEventListener('click', (event) => {
+          if (!(event.target instanceof Element)) return;
+          const row = event.target.closest('button[data-record-id]');
+          if (!row) return;
+          openRecordSheet('edit', row.dataset.recordId, row);
+        });
+
+        dom.unitToggle.addEventListener('click', (event) => {
+          if (!(event.target instanceof Element)) return;
+          const button = event.target.closest('[data-unit]');
+          if (!button) return;
+          changeDisplayUnit(button.dataset.unit);
+        });
+
+        dom.goalInput.addEventListener('input', clearSettingsError);
+        dom.startInput.addEventListener('input', clearSettingsError);
+        dom.exportButton.addEventListener('click', exportBackup);
+        dom.importButton.addEventListener('click', () => dom.importFileInput.click());
+        dom.importFileInput.addEventListener('change', () => {
+          const file = dom.importFileInput.files && dom.importFileInput.files[0];
+          if (file) handleImportFile(file);
+        });
+        dom.clearDataButton.addEventListener('click', requestClearData);
+
+        dom.recordCloseButton.addEventListener('click', () => closeRecordSheet());
+        dom.recordBackdrop.addEventListener('click', () => closeRecordSheet());
+        dom.recordForm.addEventListener('submit', submitRecord);
+        dom.deleteRecordButton.addEventListener('click', requestDeleteRecord);
+        dom.weightInput.addEventListener('input', () => {
+          dom.weightError.hidden = true;
+          dom.weightError.textContent = '';
+          dom.weightInput.removeAttribute('aria-invalid');
+          dom.weightEntry.classList.remove('has-error');
+          dom.formError.hidden = true;
+        });
+        const clearTimeError = () => {
+          dom.timeError.hidden = true;
+          dom.timeError.textContent = '';
+          dom.dateInput.removeAttribute('aria-invalid');
+          dom.timeInput.removeAttribute('aria-invalid');
+          dom.formError.hidden = true;
+        };
+        dom.dateInput.addEventListener('input', clearTimeError);
+        dom.timeInput.addEventListener('input', clearTimeError);
+        dom.noteInput.addEventListener('input', () => { dom.formError.hidden = true; });
+
+        dom.confirmCancelButton.addEventListener('click', () => closeConfirm());
+        dom.confirmAcceptButton.addEventListener('click', acceptConfirm);
+        dom.confirmBackdrop.addEventListener('click', () => closeConfirm());
+
+        document.addEventListener('keydown', (event) => {
+          if (event.key === 'Escape') {
+            if (!dom.confirmLayer.hidden) {
+              event.preventDefault();
+              closeConfirm();
+              return;
+            }
+            if (!dom.recordLayer.hidden) {
+              event.preventDefault();
+              closeRecordSheet();
+              return;
+            }
+            if (!dom.settingsView.hidden) {
+              event.preventDefault();
+              closeSettings();
+              return;
+            }
+          }
+
+          if (event.key !== 'Tab') return;
+          const dialog = getTopLayerDialog();
+          if (!dialog) return;
+          const focusable = getFocusableElements(dialog);
+          if (!focusable.length) {
+            event.preventDefault();
+            return;
+          }
+          const first = focusable[0];
+          const last = focusable[focusable.length - 1];
+          const active = document.activeElement;
+          if (!dialog.contains(active)) {
+            event.preventDefault();
+            (event.shiftKey ? last : first).focus();
+            return;
+          }
+          if (event.shiftKey && active === first) {
+            event.preventDefault();
+            last.focus();
+          } else if (!event.shiftKey && active === last) {
+            event.preventDefault();
+            first.focus();
+          }
+        });
+
+        window.addEventListener('resize', () => {
+          window.clearTimeout(resizeTimer);
+          resizeTimer = window.setTimeout(() => {
+            if (dom.trendBody.querySelector('.chart-holder')) renderTrend();
+          }, 120);
+        });
+
+        window.addEventListener('storage', (event) => {
+          if (event.key !== STORAGE_KEY) return;
+          if (!dom.settingsView.hidden || !dom.recordLayer.hidden || !dom.confirmLayer.hidden) return;
+          if (event.newValue === null) {
+            state = createDefaultState();
+            renderAll();
+            return;
+          }
+          try {
+            state = migrateState(JSON.parse(event.newValue));
+            renderAll();
+          } catch (error) {
+            showToast('另一个标签页更新了数据，但本页读取失败');
+          }
+        });
+
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState !== 'visible') return;
+          if (nowDateKey() !== lastRenderedToday) renderAll();
+          scheduleDayRefresh();
+        });
+      }
+
+      function scheduleDayRefresh() {
+        window.clearTimeout(dayRefreshTimer);
+        const parts = beijingParts();
+        const millisecondsIntoDay = ((parts.hour * 3600 + parts.minute * 60 + parts.second) * 1000) + (Date.now() % 1000);
+        const wait = Math.max(1200, DAY_MS - millisecondsIntoDay + 1200);
+        dayRefreshTimer = window.setTimeout(() => {
+          renderAll();
+          if (!dom.recordLayer.hidden) {
+            dom.dateInput.max = nowDateKey();
+          }
+          scheduleDayRefresh();
+        }, wait);
+      }
+
+      function initialize() {
+        const loaded = readInitialState();
+        state = loaded.state;
+        bindEvents();
+        renderAll();
+        syncLayerState();
+        scheduleDayRefresh();
+        if (loaded.error) window.setTimeout(() => showToast(loaded.error, 4200), 260);
+      }
+
+      initialize();
+
+      // 可选 PWA 外壳：HTTP(S) 下才挂 manifest / 图标并注册离线缓存。
+      // 直接打开 file:// 时不加载附加资源，避免 CORS 噪音，也不影响单文件使用。
+      if (location.protocol === 'https:' || location.protocol === 'http:') {
+        if (!document.querySelector('link[rel="manifest"]')) {
+          const manifestLink = document.createElement('link');
+          manifestLink.rel = 'manifest';
+          manifestLink.href = 'manifest.webmanifest';
+          document.head.append(manifestLink);
+        }
+        if (!document.querySelector('link[rel="apple-touch-icon"]')) {
+          const touchIconLink = document.createElement('link');
+          touchIconLink.rel = 'apple-touch-icon';
+          touchIconLink.href = 'apple-touch-icon.png';
+          document.head.append(touchIconLink);
+        }
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('./sw.js').catch(() => {
+              // 离线外壳注册失败时，单文件应用本身仍完整可用。
+            });
+          }, { once: true });
+        }
+      }
+    })();
+  </script>
+</body>
+</html>
