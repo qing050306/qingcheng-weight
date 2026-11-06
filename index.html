@@ -372,6 +372,125 @@
     .goal-change.is-up b { color: var(--up); }
     .goal-remaining { color: var(--ink-soft); font-weight: 600; }
     .goal-card.is-complete .goal-remaining { color: var(--accent-deep); }
+    .goal-date { color: var(--faint); font-size: 10.5px; white-space: nowrap; margin-left: 4px; }
+
+    /* ===== 目标预测 ===== */
+    .goal-forecast {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-top: 12px;
+      padding-top: 11px;
+      border-top: 1px dashed var(--line-strong);
+      color: var(--muted);
+      font-size: 11.5px;
+      line-height: 1.55;
+    }
+    .forecast-row {
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 2px 6px;
+    }
+    .goal-forecast b {
+      color: var(--ink-soft);
+      font-family: var(--font-serif);
+      font-size: 12.5px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .forecast-delta { font-weight: 600; }
+    .forecast-delta.is-early { color: var(--down); }
+    .forecast-delta.is-late { color: var(--up); }
+    .forecast-delta.is-flat { color: var(--flat); }
+
+    /* ===== 本月目标 ===== */
+    .month-card { padding: 19px 21px 18px; }
+    .month-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .month-period { color: var(--faint); font-size: 11px; letter-spacing: 0.03em; white-space: nowrap; }
+    .month-target {
+      display: flex;
+      align-items: baseline;
+      gap: 7px;
+      margin-top: 13px;
+      min-width: 0;
+    }
+    .month-target-value {
+      color: var(--ink);
+      font-family: var(--font-serif);
+      font-size: 36px;
+      font-weight: 500;
+      line-height: 0.95;
+      letter-spacing: -0.03em;
+      font-variant-numeric: tabular-nums;
+    }
+    .month-target-unit { color: var(--muted); font-size: 12.5px; }
+    .month-target-note { margin-left: auto; color: var(--faint); font-size: 11px; white-space: nowrap; }
+    .month-card .goal-bar { margin-top: 14px; height: 6px; }
+    .month-card .goal-scale { margin-top: 8px; }
+    .month-card .goal-metrics { margin-top: 12px; }
+    .month-foot {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 11px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--line-strong);
+      color: var(--muted);
+      font-size: 11.5px;
+    }
+    .month-foot b { color: var(--ink-soft); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+    /* ===== 首次引导 ===== */
+    .onboarding-sheet { padding-bottom: 20px; }
+    .onboarding-lead {
+      margin-bottom: 16px;
+      color: var(--muted);
+      font-size: 12.5px;
+      line-height: 1.7;
+    }
+    .onboarding-preview {
+      margin-top: 15px;
+      padding: 11px 13px;
+      color: var(--accent-deep);
+      background: var(--accent-soft);
+      border: 1px solid #dcebf3;
+      border-radius: 13px;
+      font-size: 12px;
+      line-height: 1.7;
+    }
+    .onboarding-preview b {
+      font-family: var(--font-serif);
+      font-size: 12.5px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .setting-input.setting-input-month {
+      width: 170px;
+      font-family: var(--font-sans);
+      font-size: 13.5px;
+      letter-spacing: 0.01em;
+    }
+    .onboarding-later {
+      align-self: center;
+      min-height: 42px;
+      padding: 0 10px;
+      color: var(--muted);
+      background: none;
+      border: 0;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 500;
+      transition: color 150ms ease, background-color 150ms ease;
+    }
+    .onboarding-later:hover { color: var(--ink-soft); background: rgba(233, 242, 247, 0.72); }
+    .onboarding-unit { margin: 2px 0 16px; }
 
     /* ===== 趋势图 ===== */
     .trend-card { padding: 19px 21px 17px; }
@@ -1269,6 +1388,7 @@
       <main class="main" id="mainContent">
         <section class="card current-card" id="currentCard" aria-labelledby="currentHeading"></section>
         <section class="card goal-card" id="goalCard" aria-labelledby="goalHeading" hidden></section>
+        <section class="card month-card" id="monthCard" aria-labelledby="monthHeading" hidden></section>
 
         <section class="card trend-card" aria-labelledby="trendHeading">
           <div class="card-head">
@@ -1343,7 +1463,13 @@
                 <span class="setting-unit" id="startUnitSuffix">kg</span>
               </span>
             </label>
-            <p class="setting-note" id="goalSettingsNote">目标留空时不显示进度；起始留空时自动使用最早一条记录。</p>
+            <label class="setting-row" for="goalMonthInput">
+              <span class="setting-label">目标月份</span>
+              <span class="setting-entry">
+                <input class="setting-input setting-input-month" id="goalMonthInput" type="month" autocomplete="off" aria-describedby="goalSettingsNote">
+              </span>
+            </label>
+            <p class="setting-note" id="goalSettingsNote">填了目标月份才会显示每月目标和达成预测；起始留空时自动使用最早一条记录。</p>
           </div>
           <p class="settings-error" id="settingsError" role="alert" hidden></p>
         </section>
@@ -1402,6 +1528,49 @@
       <footer class="settings-footer">
         <button class="primary-button" id="saveSettingsButton" type="button">保存设置</button>
       </footer>
+    </section>
+  </div>
+
+  <div class="overlay" id="onboardingLayer" hidden>
+    <div class="overlay-backdrop" id="onboardingBackdrop"></div>
+    <section class="sheet onboarding-sheet" id="onboardingDialog" role="dialog" aria-modal="true" aria-labelledby="onboardingTitle">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="sheet-header">
+        <h2 id="onboardingTitle">先定一个目标</h2>
+        <span aria-hidden="true"></span>
+      </div>
+      <form class="record-form" id="onboardingForm" novalidate>
+        <p class="onboarding-lead">只记录体重，数据留在本机。填一次，之后每次记录都会自动对照目标。</p>
+        <div class="unit-toggle onboarding-unit" id="onbUnitToggle" role="group" aria-label="填写单位">
+          <button type="button" data-onb-unit="kg" aria-pressed="true">公斤</button>
+          <button type="button" data-onb-unit="jin" aria-pressed="false">斤</button>
+        </div>
+        <div class="form-field">
+          <label for="onbWeightInput">现在体重</label>
+          <div class="weight-entry">
+            <input id="onbWeightInput" type="text" inputmode="decimal" autocomplete="off" placeholder="例如 240.0" required aria-describedby="onbWeightHint onbError">
+            <span class="input-unit" id="onbWeightUnit">斤</span>
+          </div>
+          <p class="field-hint" id="onbWeightHint">一位小数，40.0–600.0 斤</p>
+        </div>
+        <div class="form-field">
+          <label for="onbGoalInput">目标体重</label>
+          <div class="weight-entry">
+            <input id="onbGoalInput" type="text" inputmode="decimal" autocomplete="off" placeholder="例如 125.0" required aria-describedby="onbError">
+            <span class="input-unit" id="onbGoalUnit">斤</span>
+          </div>
+        </div>
+        <div class="form-field">
+          <label for="onbMonthInput">目标月份</label>
+          <input class="form-input" id="onbMonthInput" type="month" autocomplete="off" required aria-describedby="onbError">
+        </div>
+        <p class="onboarding-preview" id="onbPreview"></p>
+        <p class="form-error" id="onbError" role="alert" hidden></p>
+        <div class="sheet-actions">
+          <button class="primary-button save-button" id="onbSubmitButton" type="submit">开始记录</button>
+          <button class="onboarding-later" id="onbLaterButton" type="button">以后再说</button>
+        </div>
+      </form>
     </section>
   </div>
 
@@ -1482,7 +1651,7 @@
        * ============================================================ */
       const TIME_ZONE = 'Asia/Shanghai';
       const STORAGE_KEY = 'weight-v1';
-      const SCHEMA_VERSION = 1;
+      const SCHEMA_VERSION = 2;
       const BACKUP_FORMAT = 'qingcheng-weight-backup';
       const MIN_GRAMS = 20000;
       const MAX_GRAMS = 300000;
@@ -1514,6 +1683,7 @@
         settingsButton: byId('settingsButton'),
         currentCard: byId('currentCard'),
         goalCard: byId('goalCard'),
+        monthCard: byId('monthCard'),
         trendBody: byId('trendBody'),
         rangeSwitch: byId('rangeSwitch'),
         statsGrid: byId('statsGrid'),
@@ -1527,6 +1697,7 @@
         settingsContent: byId('settingsContent'),
         goalInput: byId('goalInput'),
         startInput: byId('startInput'),
+        goalMonthInput: byId('goalMonthInput'),
         goalUnitSuffix: byId('goalUnitSuffix'),
         startUnitSuffix: byId('startUnitSuffix'),
         unitToggle: byId('unitToggle'),
@@ -1557,6 +1728,22 @@
         formError: byId('formError'),
         saveRecordButton: byId('saveRecordButton'),
         deleteRecordButton: byId('deleteRecordButton'),
+
+        onboardingLayer: byId('onboardingLayer'),
+        onboardingBackdrop: byId('onboardingBackdrop'),
+        onboardingDialog: byId('onboardingDialog'),
+        onboardingForm: byId('onboardingForm'),
+        onbUnitToggle: byId('onbUnitToggle'),
+        onbWeightInput: byId('onbWeightInput'),
+        onbWeightUnit: byId('onbWeightUnit'),
+        onbWeightHint: byId('onbWeightHint'),
+        onbGoalInput: byId('onbGoalInput'),
+        onbGoalUnit: byId('onbGoalUnit'),
+        onbMonthInput: byId('onbMonthInput'),
+        onbPreview: byId('onbPreview'),
+        onbError: byId('onbError'),
+        onbSubmitButton: byId('onbSubmitButton'),
+        onbLaterButton: byId('onbLaterButton'),
 
         confirmLayer: byId('confirmLayer'),
         confirmBackdrop: byId('confirmBackdrop'),
@@ -1805,7 +1992,13 @@
         return {
           version: SCHEMA_VERSION,
           records: [],
-          settings: { unit: 'kg', goalGrams: null, startGrams: null }
+          settings: {
+            unit: 'kg',
+            goalGrams: null,
+            startGrams: null,
+            goalDate: null,
+            onboarded: false
+          }
         };
       }
 
@@ -1824,6 +2017,14 @@
         if (value === null || value === undefined) return null;
         if (!Number.isInteger(value) || value < MIN_GRAMS || value > MAX_GRAMS) {
           throw new Error(`${label}需在 20.0–300.0 公斤之间。`);
+        }
+        return value;
+      }
+
+      function normalizeGoalDate(value) {
+        if (value === null || value === undefined || value === '') return null;
+        if (typeof value !== 'string' || !isValidDateKey(value)) {
+          throw new Error('目标日期格式不正确。');
         }
         return value;
       }
@@ -1871,13 +2072,18 @@
         if (settings.unit !== 'kg' && settings.unit !== 'jin') {
           throw new Error('显示单位格式不正确。');
         }
+        const onboarded = typeof settings.onboarded === 'boolean'
+          ? settings.onboarded
+          : records.length > 0;
         return {
           version: SCHEMA_VERSION,
           records,
           settings: {
             unit: settings.unit,
             goalGrams: normalizeSettingGrams(settings.goalGrams, '目标体重'),
-            startGrams: normalizeSettingGrams(settings.startGrams, '起始体重')
+            startGrams: normalizeSettingGrams(settings.startGrams, '起始体重'),
+            goalDate: normalizeGoalDate(settings.goalDate),
+            onboarded
           }
         };
       }
@@ -1889,9 +2095,16 @@
         const version = Number(input.version);
         if (!Number.isInteger(version) || version < 1) throw new Error('数据版本无效。');
         if (version > SCHEMA_VERSION) throw new Error('数据版本高于当前应用，无法读取。');
-        // 迁移预留：未来 SCHEMA_VERSION 升级时，在这里按版本逐级升级字段后再校验。
-        if (version < SCHEMA_VERSION) {
-          // 当前 v1 是首个版本，暂无旧版迁移分支。
+        if (version < 2) {
+          // v1 → v2：新增目标月份与首次引导标记；已有记录的旧数据视为已完成引导。
+          if (!input.settings || typeof input.settings !== 'object' || Array.isArray(input.settings)) {
+            throw new Error('设置数据格式不正确。');
+          }
+          if (input.settings.goalDate === undefined) input.settings.goalDate = null;
+          if (input.settings.onboarded === undefined) {
+            input.settings.onboarded = Array.isArray(input.records) && input.records.length > 0;
+          }
+          input.version = SCHEMA_VERSION;
         }
         return normalizeState(input);
       }
@@ -1905,7 +2118,18 @@
         }
         if (raw === null) return { state: createDefaultState(), error: '' };
         try {
-          return { state: migrateState(JSON.parse(raw)), error: '' };
+          const parsed = JSON.parse(raw);
+          const originalVersion = Number(parsed.version);
+          const migrated = migrateState(parsed);
+          // 旧版本数据在读取时完成升级后立即写回，避免每次打开都重复迁移。
+          if (originalVersion !== SCHEMA_VERSION) {
+            try {
+              window.localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
+            } catch (error) {
+              // 写回失败时内存中的已完成迁移，功能不受影响。
+            }
+          }
+          return { state: migrated, error: '' };
         } catch (error) {
           return { state: createDefaultState(), error: '本地体重数据读取失败，已按空白数据启动。' };
         }
@@ -1971,11 +2195,197 @@
       }
 
       /* ============================================================
+       * 目标日期、每月目标与达成预测
+       * ============================================================ */
+      function monthKeyOf(dateKey) {
+        return String(dateKey).slice(0, 7);
+      }
+
+      function currentMonthKey() {
+        return monthKeyOf(nowDateKey());
+      }
+
+      function isValidMonthKey(monthKey) {
+        if (!/^\d{4}-\d{2}$/.test(monthKey)) return false;
+        const year = Number(monthKey.slice(0, 4));
+        const month = Number(monthKey.slice(5, 7));
+        return year >= 1900 && year <= 9999 && month >= 1 && month <= 12;
+      }
+
+      function endOfMonthDateKey(monthKey) {
+        const year = Number(monthKey.slice(0, 4));
+        const month = Number(monthKey.slice(5, 7));
+        const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+        return `${monthKey}-${pad2(lastDay)}`;
+      }
+
+      function monthKeysBetween(startMonthKey, endMonthKey) {
+        const keys = [];
+        let year = Number(startMonthKey.slice(0, 4));
+        let month = Number(startMonthKey.slice(5, 7));
+        const endYear = Number(endMonthKey.slice(0, 4));
+        const endMonth = Number(endMonthKey.slice(5, 7));
+        let guard = 0;
+        while ((year < endYear || (year === endYear && month <= endMonth)) && guard < 600) {
+          keys.push(`${year}-${pad2(month)}`);
+          month += 1;
+          if (month > 12) {
+            month = 1;
+            year += 1;
+          }
+          guard += 1;
+        }
+        return keys;
+      }
+
+      function formatMonthLabel(monthKey) {
+        return `${Number(monthKey.slice(0, 4))}年${Number(monthKey.slice(5, 7))}月`;
+      }
+
+      function formatDateLabel(dateKey) {
+        return `${Number(dateKey.slice(0, 4))}年${Number(dateKey.slice(5, 7))}月${Number(dateKey.slice(8, 10))}日`;
+      }
+
+      function recordBeforeDateKey(dateKey) {
+        let found = null;
+        for (const record of sortedRecordsAscending()) {
+          if (recordDateKey(record) < dateKey) found = record;
+          else break;
+        }
+        return found;
+      }
+
+      // 从开始记录的那个月到目标月份，按月末线性切分；最后一个月正好落在目标体重。
+      function getGoalPlan() {
+        const goalGrams = state.settings.goalGrams;
+        const goalDate = state.settings.goalDate;
+        const earliest = getEarliestRecord();
+        if (goalGrams === null || !goalDate || !earliest) return null;
+        const startGrams = state.settings.startGrams !== null
+          ? state.settings.startGrams
+          : earliest.grams;
+        const startMonthKey = monthKeyOf(recordDateKey(earliest));
+        const goalMonthKey = monthKeyOf(goalDate);
+        if (goalMonthKey < startMonthKey) return null;
+        const months = monthKeysBetween(startMonthKey, goalMonthKey);
+        if (!months.length) return null;
+
+        const total = months.length;
+        const steps = months.map((monthKey, index) => ({
+          monthKey,
+          targetGrams: Math.round(startGrams + (goalGrams - startGrams) * ((index + 1) / total))
+        }));
+        steps[total - 1].targetGrams = goalGrams;
+
+        const thisMonthKey = currentMonthKey();
+        const currentIndex = months.indexOf(thisMonthKey);
+        let monthStartGrams = null;
+        if (currentIndex >= 0) {
+          if (currentIndex === 0) {
+            monthStartGrams = startGrams;
+          } else {
+            const before = recordBeforeDateKey(`${thisMonthKey}-01`);
+            monthStartGrams = before ? before.grams : steps[currentIndex - 1].targetGrams;
+          }
+        }
+
+        return {
+          startGrams,
+          goalGrams,
+          goalDate,
+          startMonthKey,
+          goalMonthKey,
+          months,
+          steps,
+          total,
+          currentIndex,
+          monthStartGrams,
+          currentStep: currentIndex >= 0 ? steps[currentIndex] : null
+        };
+      }
+
+      // 近 14 天每天最后一次记录的最小二乘斜率（克/天），样本不足时返回 null。
+      function getWeightTrend(days = 14) {
+        const todayKey = nowDateKey();
+        const points = getDailyPointsForRange(days, todayKey);
+        if (points.length < 3) return null;
+        const spanDays = daysBetweenDateKeys(points[0].date, points[points.length - 1].date);
+        if (spanDays < 3) return null;
+        const originKey = points[0].date;
+        let n = 0;
+        let sx = 0;
+        let sy = 0;
+        let sxx = 0;
+        let sxy = 0;
+        for (const point of points) {
+          const x = daysBetweenDateKeys(originKey, point.date);
+          n += 1;
+          sx += x;
+          sy += point.grams;
+          sxx += x * x;
+          sxy += x * point.grams;
+        }
+        const denominator = n * sxx - sx * sx;
+        if (!denominator) return null;
+        const rate = (n * sxy - sx * sy) / denominator;
+        if (!Number.isFinite(rate)) return null;
+        return { rate, sampleCount: n, spanDays, windowDays: days };
+      }
+
+      function getGoalForecast() {
+        const goalGrams = state.settings.goalGrams;
+        const latest = getLatestRecord();
+        if (goalGrams === null || !latest) return null;
+        const goalDate = state.settings.goalDate;
+        if (latest.grams === goalGrams) return { status: 'achieved', goalDate };
+
+        const trend = getWeightTrend(14);
+        if (!trend) return { status: 'unknown', goalDate };
+        const needLoss = goalGrams < latest.grams;
+        const minRate = 5; // 克/天；更小的变化视为基本持平
+        const rightWay = needLoss ? trend.rate <= -minRate : trend.rate >= minRate;
+        if (!rightWay) {
+          const wrongWay = needLoss ? trend.rate >= minRate : trend.rate <= -minRate;
+          return { status: wrongWay ? 'wrong-way' : 'flat', goalDate, rate: trend.rate };
+        }
+        const daysNeeded = (goalGrams - latest.grams) / trend.rate;
+        if (!Number.isFinite(daysNeeded) || daysNeeded < 0) {
+          return { status: 'unknown', goalDate, rate: trend.rate };
+        }
+        if (daysNeeded > 3650) return { status: 'too-far', goalDate, rate: trend.rate };
+        const dateKey = shiftDateKey(nowDateKey(), Math.max(1, Math.ceil(daysNeeded)));
+        const deltaDays = goalDate ? daysBetweenDateKeys(goalDate, dateKey) : null;
+        return {
+          status: 'ok',
+          dateKey,
+          daysNeeded: Math.ceil(daysNeeded),
+          deltaDays,
+          goalDate,
+          rate: trend.rate
+        };
+      }
+
+      // 按目标日期反推：到目标月份结束前，平均每周需要变化多少克。
+      function getRequiredPace() {
+        const goalGrams = state.settings.goalGrams;
+        const goalDate = state.settings.goalDate;
+        const latest = getLatestRecord();
+        if (goalGrams === null || !goalDate || !latest) return null;
+        const daysLeft = daysBetweenDateKeys(nowDateKey(), goalDate);
+        if (daysLeft <= 0) return null;
+        return {
+          daysLeft,
+          perWeekGrams: ((goalGrams - latest.grams) / daysLeft) * 7
+        };
+      }
+
+      /* ============================================================
        * 首页渲染
        * ============================================================ */
       function renderAll() {
         renderCurrentCard();
         renderGoalCard();
+        renderMonthCard();
         renderStats();
         renderTrend();
         renderHistory();
@@ -2102,6 +2512,11 @@
           ? `目标已达成，起始 ${formatWeightValue(start, unit)} ${unitLabel(unit)}，目标 ${formatWeightValue(target, unit)} ${unitLabel(unit)}`
           : `已完成 ${percent}%，还差 ${formatWeightValue(remaining, unit)} ${unitLabel(unit)}`;
 
+        const goalDate = state.settings.goalDate;
+        const goalDateMarkup = goalDate
+          ? `<span class="goal-date">· ${formatMonthLabel(monthKeyOf(goalDate))}</span>`
+          : '';
+
         dom.goalCard.hidden = false;
         dom.goalCard.classList.toggle('is-complete', achieved);
         dom.goalCard.innerHTML = `
@@ -2114,12 +2529,138 @@
           </div>
           <div class="goal-scale">
             <span>起始 <b>${formatWeightValue(start, unit)} ${unitSuffix(unit)}</b></span>
+            <span>目标 <b>${formatWeightValue(target, unit)} ${unitSuffix(unit)}</b>${goalDateMarkup}</span>
+          </div>
+          <div class="goal-metrics">
+            ${changeMarkup}
+            ${remainingMarkup}
+          </div>
+          ${buildForecastMarkup(unit)}
+        `;
+      }
+
+      function buildForecastMarkup(unit) {
+        const forecast = getGoalForecast();
+        const pace = getRequiredPace();
+        const rows = [];
+
+        if (forecast && forecast.status === 'achieved') {
+          rows.push('<div class="forecast-row"><span>目标已达成</span></div>');
+        } else if (forecast && forecast.status === 'ok') {
+          let deltaMarkup = '';
+          if (forecast.deltaDays !== null) {
+            if (forecast.deltaDays === 0) {
+              deltaMarkup = '<span class="forecast-delta is-flat">与计划同步</span>';
+            } else if (forecast.deltaDays < 0) {
+              deltaMarkup = `<span class="forecast-delta is-early">比计划早 ${Math.abs(forecast.deltaDays)} 天</span>`;
+            } else {
+              deltaMarkup = `<span class="forecast-delta is-late">比计划晚 ${forecast.deltaDays} 天</span>`;
+            }
+          }
+          rows.push(`<div class="forecast-row"><span>按近期速度预计</span><b>${formatDateLabel(forecast.dateKey)}</b>${deltaMarkup}</div>`);
+        } else if (forecast && forecast.status === 'wrong-way') {
+          const word = forecast.rate > 0 ? '上升' : '下降';
+          rows.push(`<div class="forecast-row"><span>近 14 天体重在${word}，暂时无法预测达成</span></div>`);
+        } else if (forecast && forecast.status === 'flat') {
+          rows.push('<div class="forecast-row"><span>近 14 天基本持平，再记几天就能预测</span></div>');
+        } else if (forecast && forecast.status === 'too-far') {
+          rows.push('<div class="forecast-row"><span>按近 14 天速度，10 年内到不了这个目标</span></div>');
+        } else if (forecast) {
+          rows.push('<div class="forecast-row"><span>按近期速度预计</span><b>—</b><span>多记几天再来</span></div>');
+        }
+
+        if (pace && Math.abs(pace.perWeekGrams) >= 1) {
+          const verb = pace.perWeekGrams < 0 ? '减' : '增';
+          const value = Math.abs(pace.perWeekGrams);
+          rows.push(
+            `<div class="forecast-row"><span>计划每周${verb}</span><b>${formatWeightValue(value, unit)} ${unitSuffix(unit)}</b><span>距目标 ${pace.daysLeft} 天</span></div>`
+          );
+        }
+
+        if (!rows.length) return '';
+        return `<div class="goal-forecast">${rows.join('')}</div>`;
+      }
+
+      function renderMonthCard() {
+        const plan = getGoalPlan();
+        const latest = getLatestRecord();
+        if (!plan || !plan.currentStep || !latest) {
+          dom.monthCard.hidden = true;
+          dom.monthCard.innerHTML = '';
+          return;
+        }
+
+        const unit = state.settings.unit;
+        const target = plan.currentStep.targetGrams;
+        const base = plan.monthStartGrams !== null ? plan.monthStartGrams : plan.startGrams;
+        const current = latest.grams;
+        const losing = target <= base;
+        const achieved = losing ? current <= target : current >= target;
+        let progress = 0;
+        if (base !== target) progress = (current - base) / (target - base);
+        if (!Number.isFinite(progress)) progress = 0;
+        progress = Math.max(0, Math.min(1, progress));
+        if (achieved) progress = 1;
+        const percent = Math.round(progress * 100);
+
+        const sinceMonthStart = current - base;
+        let changeMarkup;
+        if (sinceMonthStart === 0) {
+          changeMarkup = `<span class="goal-change is-flat">较月初 <b>0.0 ${unitSuffix(unit)}</b></span>`;
+        } else {
+          const direction = changeDirection(sinceMonthStart);
+          changeMarkup = `
+            <span class="goal-change ${direction.className}">
+              较月初 <span aria-hidden="true">${direction.arrow}</span><span class="sr-only">${direction.spoken}</span>
+              <b>${formatWeightValue(Math.abs(sinceMonthStart), unit)} ${unitSuffix(unit)}</b>
+            </span>
+          `;
+        }
+
+        const remaining = Math.abs(current - target);
+        const remainingMarkup = achieved
+          ? '<span class="goal-remaining">本月已达成</span>'
+          : `<span class="goal-remaining">还差 ${formatWeightValue(remaining, unit)} ${unitSuffix(unit)}</span>`;
+
+        const daysLeft = Math.max(0, daysBetweenDateKeys(nowDateKey(), endOfMonthDateKey(plan.currentStep.monthKey)));
+        let footMarkup;
+        if (achieved) {
+          footMarkup = '<span>本月目标已达成</span><span>继续保持</span>';
+        } else if (daysLeft === 0) {
+          footMarkup = `<span>今天是本月最后一天</span><span>还差 <b>${formatWeightValue(remaining, unit)} ${unitSuffix(unit)}</b></span>`;
+        } else {
+          const weekly = ((target - current) / daysLeft) * 7;
+          const verb = weekly < 0 ? '减' : '增';
+          footMarkup = `<span>本月还剩 <b>${daysLeft}</b> 天</span><span>每周${verb} <b>${formatWeightValue(Math.abs(weekly), unit)} ${unitSuffix(unit)}</b> 可达标</span>`;
+        }
+
+        const ariaValueText = achieved
+          ? `本月目标已达成，${formatMonthLabel(plan.currentStep.monthKey)}目标 ${formatWeightValue(target, unit)} ${unitLabel(unit)}`
+          : `本月已完成 ${percent}%，还差 ${formatWeightValue(remaining, unit)} ${unitLabel(unit)}`;
+
+        dom.monthCard.hidden = false;
+        dom.monthCard.innerHTML = `
+          <div class="month-head">
+            <h2 class="card-title" id="monthHeading">本月目标</h2>
+            <span class="month-period">${formatMonthLabel(plan.currentStep.monthKey)} · ${plan.currentIndex + 1}/${plan.total}</span>
+          </div>
+          <div class="month-target">
+            <span class="month-target-value">${formatWeightValue(target, unit)}</span>
+            <span class="month-target-unit">${unitSuffix(unit)}</span>
+            <span class="month-target-note">月底应到</span>
+          </div>
+          <div class="goal-bar month-bar" role="progressbar" aria-label="本月目标进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}" aria-valuetext="${ariaValueText}">
+            <span class="goal-fill" style="width: ${percent}%"></span>
+          </div>
+          <div class="goal-scale month-scale">
+            <span>月初 <b>${formatWeightValue(base, unit)} ${unitSuffix(unit)}</b></span>
             <span>目标 <b>${formatWeightValue(target, unit)} ${unitSuffix(unit)}</b></span>
           </div>
           <div class="goal-metrics">
             ${changeMarkup}
             ${remainingMarkup}
           </div>
+          <div class="month-foot">${footMarkup}</div>
         `;
       }
 
@@ -2441,13 +2982,15 @@
       function syncLayerState() {
         const settingsOpen = !dom.settingsView.hidden;
         const recordOpen = !dom.recordLayer.hidden;
+        const onboardingOpen = !dom.onboardingLayer.hidden;
         const confirmOpen = !dom.confirmLayer.hidden;
-        const anyOpen = settingsOpen || recordOpen || confirmOpen;
+        const anyOpen = settingsOpen || recordOpen || onboardingOpen || confirmOpen;
 
         setInert(dom.appRoot, anyOpen);
         setInert(dom.skipLink, anyOpen);
         setInert(dom.settingsView, confirmOpen);
         setInert(dom.recordLayer, confirmOpen);
+        setInert(dom.onboardingLayer, confirmOpen);
         setInert(dom.confirmLayer, false);
         document.body.classList.toggle('modal-open', anyOpen);
       }
@@ -2478,6 +3021,7 @@
 
       function getTopLayerDialog() {
         if (!dom.confirmLayer.hidden) return dom.confirmDialog;
+        if (!dom.onboardingLayer.hidden) return dom.onboardingDialog;
         if (!dom.recordLayer.hidden) return dom.recordDialog;
         if (!dom.settingsView.hidden) return dom.settingsPanel;
         return null;
@@ -2675,6 +3219,224 @@
       }
 
       /* ============================================================
+       * 首次引导：现在体重 + 目标体重 + 目标月份
+       * ============================================================ */
+      let onboardingSaving = false;
+      let onboardingCloseTimer = null;
+
+      function defaultOnboardingMonth() {
+        const parts = beijingParts();
+        const target = new Date(Date.UTC(parts.year, parts.month - 1 + 6, 1));
+        return `${target.getUTCFullYear()}-${pad2(target.getUTCMonth() + 1)}`;
+      }
+
+      function syncOnboardingUnit() {
+        const unit = state.settings.unit;
+        dom.onbUnitToggle.querySelectorAll('[data-onb-unit]').forEach((button) => {
+          button.setAttribute('aria-pressed', String(button.dataset.onbUnit === unit));
+        });
+        dom.onbWeightUnit.textContent = unitSuffix(unit);
+        dom.onbGoalUnit.textContent = unitSuffix(unit);
+        dom.onbWeightHint.textContent = `一位小数，${formatRange(unit)}`;
+        dom.onbWeightInput.placeholder = unit === 'jin' ? '例如 240.0' : '例如 120.0';
+        dom.onbGoalInput.placeholder = unit === 'jin' ? '例如 125.0' : '例如 62.5';
+      }
+
+      function switchOnboardingUnit(nextUnit) {
+        const previousUnit = state.settings.unit;
+        if (!UNITS[nextUnit] || nextUnit === previousUnit) return;
+        const weightRaw = dom.onbWeightInput.value;
+        const goalRaw = dom.onbGoalInput.value;
+        const nextState = cloneState(state);
+        nextState.settings.unit = nextUnit;
+        if (!commitState(nextState)) {
+          showOnboardingError('切换单位失败：本机存储不可用。', 'weight');
+          return;
+        }
+        const convert = (input, raw) => {
+          if (!String(raw).trim()) return;
+          const parsed = parseWeightInput(raw, previousUnit);
+          if (parsed.ok) input.value = formatWeightValue(parsed.grams, nextUnit);
+        };
+        convert(dom.onbWeightInput, weightRaw);
+        convert(dom.onbGoalInput, goalRaw);
+        syncOnboardingUnit();
+        clearOnboardingError();
+        updateOnboardingPreview();
+        renderAll();
+      }
+
+      function clearOnboardingError() {
+        dom.onbError.hidden = true;
+        dom.onbError.textContent = '';
+        dom.onbWeightInput.removeAttribute('aria-invalid');
+        dom.onbGoalInput.removeAttribute('aria-invalid');
+        dom.onbMonthInput.removeAttribute('aria-invalid');
+      }
+
+      function showOnboardingError(message, field) {
+        dom.onbError.textContent = message;
+        dom.onbError.hidden = false;
+        if (field === 'weight') {
+          dom.onbWeightInput.setAttribute('aria-invalid', 'true');
+          dom.onbWeightInput.focus();
+        } else if (field === 'goal') {
+          dom.onbGoalInput.setAttribute('aria-invalid', 'true');
+          dom.onbGoalInput.focus();
+        } else if (field === 'month') {
+          dom.onbMonthInput.setAttribute('aria-invalid', 'true');
+          dom.onbMonthInput.focus();
+        }
+      }
+
+      function updateOnboardingPreview() {
+        const unit = state.settings.unit;
+        const weight = parseWeightInput(dom.onbWeightInput.value, unit);
+        const goal = parseWeightInput(dom.onbGoalInput.value, unit);
+        const monthRaw = String(dom.onbMonthInput.value || '').trim();
+        if (!weight.ok || !goal.ok || !isValidMonthKey(monthRaw) || monthRaw < currentMonthKey()) {
+          dom.onbPreview.textContent = '填好三项后，这里会算出每月大概要变多少。';
+          return;
+        }
+        const months = monthKeysBetween(currentMonthKey(), monthRaw);
+        if (!months.length) {
+          dom.onbPreview.textContent = '目标月份不能早于本月。';
+          return;
+        }
+        const diff = goal.grams - weight.grams;
+        if (diff === 0) {
+          dom.onbPreview.innerHTML = `目标与现在相同，共 <b>${months.length}</b> 个月。`;
+          return;
+        }
+        const perMonth = Math.round(Math.abs(diff) / months.length);
+        const verb = diff < 0 ? '减' : '增';
+        dom.onbPreview.innerHTML = `还要${verb} <b>${formatWeightValue(Math.abs(diff), unit)} ${unitSuffix(unit)}</b>，`
+          + `共 <b>${months.length}</b> 个月，每月约${verb} <b>${formatWeightValue(perMonth, unit)} ${unitSuffix(unit)}</b>。`;
+      }
+
+      function openOnboarding() {
+        if (!dom.onboardingLayer.hidden) return;
+        if (onboardingCloseTimer) {
+          window.clearTimeout(onboardingCloseTimer);
+          onboardingCloseTimer = null;
+        }
+        const unit = state.settings.unit;
+        const latest = getLatestRecord();
+        dom.onbWeightInput.value = latest ? formatWeightValue(latest.grams, unit) : '';
+        dom.onbGoalInput.value = state.settings.goalGrams === null
+          ? ''
+          : formatWeightValue(state.settings.goalGrams, unit);
+        dom.onbMonthInput.min = currentMonthKey();
+        dom.onbMonthInput.value = state.settings.goalDate
+          ? monthKeyOf(state.settings.goalDate)
+          : defaultOnboardingMonth();
+        syncOnboardingUnit();
+        clearOnboardingError();
+        updateOnboardingPreview();
+        onboardingSaving = false;
+        dom.onbSubmitButton.disabled = false;
+        dom.onbSubmitButton.textContent = '开始记录';
+        dom.onboardingLayer.classList.remove('is-open');
+        dom.onboardingLayer.hidden = false;
+        syncLayerState();
+        window.requestAnimationFrame(() => {
+          dom.onboardingLayer.classList.add('is-open');
+          dom.onbWeightInput.focus({ preventScroll: true });
+        });
+      }
+
+      function closeOnboarding() {
+        if (dom.onboardingLayer.hidden) return;
+        if (onboardingCloseTimer) window.clearTimeout(onboardingCloseTimer);
+        dom.onboardingLayer.classList.remove('is-open');
+        const delay = motionDelay(245);
+        onboardingCloseTimer = window.setTimeout(() => {
+          dom.onboardingLayer.hidden = true;
+          onboardingCloseTimer = null;
+          syncLayerState();
+        }, delay);
+      }
+
+      function submitOnboarding(event) {
+        if (event) event.preventDefault();
+        if (onboardingSaving) return;
+        clearOnboardingError();
+
+        const unit = state.settings.unit;
+        const weight = parseWeightInput(dom.onbWeightInput.value, unit);
+        if (!weight.ok) {
+          showOnboardingError(`现在体重：${weight.error}`, 'weight');
+          return;
+        }
+        const goal = parseWeightInput(dom.onbGoalInput.value, unit);
+        if (!goal.ok) {
+          showOnboardingError(`目标体重：${goal.error}`, 'goal');
+          return;
+        }
+        const monthRaw = String(dom.onbMonthInput.value || '').trim();
+        if (!isValidMonthKey(monthRaw)) {
+          showOnboardingError('请选择目标月份。', 'month');
+          return;
+        }
+        if (monthRaw < currentMonthKey()) {
+          showOnboardingError('目标月份不能早于本月。', 'month');
+          return;
+        }
+
+        onboardingSaving = true;
+        dom.onbSubmitButton.disabled = true;
+        dom.onbSubmitButton.textContent = '保存中…';
+        try {
+          const todayKey = nowDateKey();
+          const nextState = cloneState(state);
+          const alreadyRecorded = nextState.records.some(
+            (record) => recordDateKey(record) === todayKey && record.grams === weight.grams
+          );
+          if (!alreadyRecorded) {
+            nextState.records.push({
+              id: makeId(),
+              grams: weight.grams,
+              at: currentBeijingISO(),
+              note: '',
+              createdAt: Date.now()
+            });
+          }
+          nextState.settings = {
+            ...nextState.settings,
+            goalGrams: goal.grams,
+            startGrams: weight.grams,
+            goalDate: endOfMonthDateKey(monthRaw),
+            onboarded: true
+          };
+          if (!commitState(nextState)) throw new Error('无法写入本机存储');
+          renderAll();
+          onboardingSaving = false;
+          dom.onbSubmitButton.disabled = false;
+          dom.onbSubmitButton.textContent = '开始记录';
+          closeOnboarding();
+          showToast(`目标已设定 · ${formatWeightValue(goal.grams, unit)} ${unitSuffix(unit)}`);
+        } catch (error) {
+          onboardingSaving = false;
+          dom.onbSubmitButton.disabled = false;
+          dom.onbSubmitButton.textContent = '开始记录';
+          showOnboardingError('保存失败：本机存储不可用或已满。', 'weight');
+        }
+      }
+
+      function skipOnboarding() {
+        clearOnboardingError();
+        const nextState = cloneState(state);
+        nextState.settings = { ...nextState.settings, onboarded: true };
+        if (!commitState(nextState)) {
+          showOnboardingError('保存失败：本机存储不可用。', 'weight');
+          return;
+        }
+        renderAll();
+        closeOnboarding();
+        showToast('之后可以在设置里添加目标');
+      }
+
+      /* ============================================================
        * 设置面板
        * ============================================================ */
       function clearSettingsError() {
@@ -2682,6 +3444,7 @@
         dom.settingsError.textContent = '';
         dom.goalInput.removeAttribute('aria-invalid');
         dom.startInput.removeAttribute('aria-invalid');
+        dom.goalMonthInput.removeAttribute('aria-invalid');
       }
 
       function showSettingsError(message, field) {
@@ -2693,6 +3456,9 @@
         } else if (field === 'start') {
           dom.startInput.setAttribute('aria-invalid', 'true');
           dom.startInput.focus();
+        } else if (field === 'month') {
+          dom.goalMonthInput.setAttribute('aria-invalid', 'true');
+          dom.goalMonthInput.focus();
         }
       }
 
@@ -2740,6 +3506,10 @@
         dom.startInput.value = state.settings.startGrams === null
           ? ''
           : formatWeightValue(state.settings.startGrams, settingsDraftUnit);
+        dom.goalMonthInput.min = currentMonthKey();
+        dom.goalMonthInput.value = state.settings.goalDate
+          ? monthKeyOf(state.settings.goalDate)
+          : '';
         updateUnitControls();
         updateDataSummary();
         clearSettingsError();
@@ -2795,6 +3565,23 @@
           showSettingsError(`起始体重：${startResult.error}`, 'start');
           return;
         }
+        const monthRaw = String(dom.goalMonthInput.value || '').trim();
+        let goalDate = null;
+        if (monthRaw) {
+          if (!isValidMonthKey(monthRaw)) {
+            showSettingsError('目标月份格式不正确。', 'month');
+            return;
+          }
+          if (monthRaw < currentMonthKey()) {
+            showSettingsError('目标月份不能早于本月。', 'month');
+            return;
+          }
+          if (goalResult.grams === null) {
+            showSettingsError('先填写目标体重，再选目标月份。', 'goal');
+            return;
+          }
+          goalDate = endOfMonthDateKey(monthRaw);
+        }
 
         isSavingSettings = true;
         dom.saveSettingsButton.disabled = true;
@@ -2802,9 +3589,11 @@
         try {
           const nextState = cloneState(state);
           nextState.settings = {
+            ...state.settings,
             unit: settingsDraftUnit,
             goalGrams: goalResult.grams,
-            startGrams: startResult.grams
+            startGrams: startResult.grams,
+            goalDate
           };
           if (!commitState(nextState)) throw new Error('无法写入本机存储');
           renderAll();
@@ -3124,6 +3913,28 @@
 
         dom.goalInput.addEventListener('input', clearSettingsError);
         dom.startInput.addEventListener('input', clearSettingsError);
+        dom.goalMonthInput.addEventListener('input', clearSettingsError);
+
+        dom.onboardingForm.addEventListener('submit', submitOnboarding);
+        dom.onbLaterButton.addEventListener('click', skipOnboarding);
+        dom.onbUnitToggle.addEventListener('click', (event) => {
+          if (!(event.target instanceof Element)) return;
+          const button = event.target.closest('[data-onb-unit]');
+          if (!button) return;
+          switchOnboardingUnit(button.dataset.onbUnit);
+        });
+        dom.onbWeightInput.addEventListener('input', () => {
+          clearOnboardingError();
+          updateOnboardingPreview();
+        });
+        dom.onbGoalInput.addEventListener('input', () => {
+          clearOnboardingError();
+          updateOnboardingPreview();
+        });
+        dom.onbMonthInput.addEventListener('input', () => {
+          clearOnboardingError();
+          updateOnboardingPreview();
+        });
         dom.exportButton.addEventListener('click', exportBackup);
         dom.importButton.addEventListener('click', () => dom.importFileInput.click());
         dom.importFileInput.addEventListener('change', () => {
@@ -3211,7 +4022,7 @@
 
         window.addEventListener('storage', (event) => {
           if (event.key !== STORAGE_KEY) return;
-          if (!dom.settingsView.hidden || !dom.recordLayer.hidden || !dom.confirmLayer.hidden) return;
+          if (!dom.settingsView.hidden || !dom.recordLayer.hidden || !dom.confirmLayer.hidden || !dom.onboardingLayer.hidden) return;
           if (event.newValue === null) {
             state = createDefaultState();
             renderAll();
@@ -3254,6 +4065,9 @@
         syncLayerState();
         scheduleDayRefresh();
         if (loaded.error) window.setTimeout(() => showToast(loaded.error, 4200), 260);
+        if (!state.settings.onboarded && !loaded.error) {
+          window.setTimeout(openOnboarding, 240);
+        }
       }
 
       initialize();

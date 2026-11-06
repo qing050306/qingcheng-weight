@@ -1,5 +1,5 @@
 /* 轻秤离线外壳：核心页面仍然是完整的单文件 index.html。 */
-const CACHE_NAME = 'qingcheng-weight-shell-v1-20261106';
+const CACHE_NAME = 'qingcheng-weight-shell-v2-20261107';
 const APP_SHELL = [
   './index.html',
   './manifest.webmanifest',
